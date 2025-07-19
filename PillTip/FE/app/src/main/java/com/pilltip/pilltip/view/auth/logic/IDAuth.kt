@@ -69,6 +69,7 @@ fun TermBottomSheet(
     onDismiss: () -> Unit
 ) {
     var isEssentialChecked by remember { mutableStateOf(false) }
+    var isAgeChecked by remember { mutableStateOf(false) }
     var isOptionalChecked by remember { mutableStateOf(false) }
     var isEssentialExpanded by remember { mutableStateOf(false) }
     var isOptionalExpanded by remember { mutableStateOf(false) }
@@ -136,7 +137,7 @@ fun TermBottomSheet(
                 )
                 WidthSpacer(8.dp)
                 Text(
-                    text = "[필수] 서비스 이용약관",
+                    text = "[필수] 필팁 서비스 이용약관 동의",
                     style = TextStyle(
                         fontSize = 14.sp,
                         fontFamily = pretendard,
@@ -160,6 +161,34 @@ fun TermBottomSheet(
             }
             AnimatedVisibility(visible = isEssentialExpanded) {
                 EssentialTerms()
+            }
+            Row(
+                modifier = Modifier.padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(imageVector =
+                    if (!isAgeChecked)
+                        ImageVector.vectorResource(R.drawable.btn_gray_checkmark)
+                    else
+                        ImageVector.vectorResource(R.drawable.btn_blue_checkmark),
+                    contentDescription = "checkBtn",
+                    modifier = Modifier
+                        .size(20.dp, 20.dp)
+                        .noRippleClickable { isAgeChecked = !isAgeChecked }
+                )
+                WidthSpacer(8.dp)
+                Text(
+                    text = "[필수] 만 14세 이상입니다.",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontFamily = pretendard,
+                        fontWeight = FontWeight(500),
+                        color = Color(0xFF686D78),
+                    ),
+                    modifier = Modifier.noRippleClickable {
+                        isAgeChecked = !isAgeChecked
+                    }
+                )
             }
             Row(
                 modifier = Modifier.padding(vertical = 10.dp),
