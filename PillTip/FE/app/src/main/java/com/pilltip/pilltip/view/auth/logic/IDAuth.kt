@@ -1,5 +1,6 @@
 package com.pilltip.pilltip.view.auth.logic
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -38,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -58,9 +58,6 @@ import com.pilltip.pilltip.composable.WidthSpacer
 import com.pilltip.pilltip.composable.noRippleClickable
 import com.pilltip.pilltip.model.signUp.SignUpViewModel
 import com.pilltip.pilltip.ui.theme.gray100
-import com.pilltip.pilltip.ui.theme.gray200
-import com.pilltip.pilltip.ui.theme.gray400
-import com.pilltip.pilltip.ui.theme.gray500
 import com.pilltip.pilltip.ui.theme.pretendard
 import com.pilltip.pilltip.ui.theme.primaryColor
 
@@ -254,6 +251,7 @@ enum class InputType {
     TEXT, EMAIL, PASSWORD, NUMBER
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun OtpInputField(
     otpText: String,
@@ -264,11 +262,10 @@ fun OtpInputField(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     BoxWithConstraints(modifier = modifier) {
-        val boxSize = maxWidth / 7 // 여백 고려해 6칸 + 패딩 맞춤
+        val boxSize = maxWidth / 7
         val space = (maxWidth - boxSize * 6) / 5
 
         Box {
-            // 실질적으로 입력을 받는 투명 TextField
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

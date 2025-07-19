@@ -135,7 +135,7 @@ fun SplashPage(navController: NavController) {
 
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 1000) // 1초간 페이드 인
+        animationSpec = tween(durationMillis = 1000)
     )
 
     Column(
@@ -147,7 +147,7 @@ fun SplashPage(navController: NavController) {
     ) {
         Image(
             imageVector = ImageVector.vectorResource(R.drawable.logo_splash),
-            contentDescription = "PillTip_Logo",
+            contentDescription = "Pilltip_Logo",
             modifier = Modifier.alpha(alpha)
         )
     }
