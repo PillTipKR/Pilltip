@@ -3,11 +3,8 @@
 
 package com.oauth2.Account.Controller;
 
+import com.oauth2.Account.Dto.*;
 import com.oauth2.Account.Service.AccountService;
-import com.oauth2.Account.Dto.ApiResponse;
-import com.oauth2.Account.Dto.LoginRequest;
-import com.oauth2.Account.Dto.SocialLoginRequest;
-import com.oauth2.Account.Dto.SignupRequest;
 import com.oauth2.Account.Entity.Account;
 import com.oauth2.User.UserInfo.Entity.User;
 import com.oauth2.Account.Service.LoginService;
@@ -17,15 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import com.oauth2.Account.Dto.LoginResponse;
 import com.oauth2.Account.Service.SignupService;
 import com.oauth2.Account.Entity.AccountToken;
 import com.oauth2.Account.Service.TokenService;
-import com.oauth2.Account.Dto.SignupResponse;
-import com.oauth2.Account.Dto.DuplicateCheckRequest;
-import com.oauth2.Account.Dto.TermsResponse;
 import com.oauth2.User.Alarm.Repository.FCMTokenRepository;
-import com.oauth2.Account.Dto.AuthMessageConstants;
 
 import java.nio.file.AccessDeniedException;
 
@@ -101,11 +93,13 @@ public class AuthController {
         
         try {
             System.out.println("SignupService.signup() 호출 시작");
-            User user = signupService.signup(request);
+            CreateUserDto createUserDto = signupService.signup(request);
+            User user = createUserDto.user();
             System.out.println("SignupService.signup() 완료 - UserId: " + user.getId());
 
             System.out.println("토큰 생성 시작");
-            AccountToken accountToken = tokenService.generateTokens(user.getId());
+            Account account = createUserDto.account();
+            AccountToken accountToken = tokenService.generateTokens(account.getId());
             System.out.println("토큰 생성 완료");
 
             SignupResponse signupResponse = SignupResponse.builder()

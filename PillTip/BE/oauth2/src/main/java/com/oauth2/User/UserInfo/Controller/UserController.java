@@ -38,7 +38,7 @@ public class UserController {
 
         try {
             User currentUser = userService.getCurrentUser(user.getId());
-            List<UserListDto> userListDtos = accountService.getUserList(account.getId());
+            List<UserListDto> userListDtos = accountService.getUserList(account.getId(),profileId);
 
             return ResponseEntity.status(200)
                     .body(ApiResponse.success(

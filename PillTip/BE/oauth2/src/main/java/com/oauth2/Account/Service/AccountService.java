@@ -13,6 +13,7 @@ import java.nio.file.AccessDeniedException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -53,7 +54,7 @@ public class AccountService {
 
 
     @Transactional
-    public List<UserListDto> getUserList(Long accountId){
+    public List<UserListDto> getUserList(Long accountId, Long profileId){
         List<UserListDto> userListDtos = new ArrayList<>();
         Account account = accountRepository.findByIdWithUsers(accountId).orElse(null);
 
@@ -63,7 +64,10 @@ public class AccountService {
                     new UserListDto(
                             users.getId(),
                             users.getNickname(),
-                            users.isMain()));
+                            users.isMain(),
+                            users.getId().equals(profileId)
+                    )
+            );
         }
         return userListDtos.stream()
                 .sorted(Comparator.comparing(UserListDto::userId))
