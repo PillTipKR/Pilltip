@@ -86,9 +86,9 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun getMyInfo(token: String): UserData? {
+    suspend fun getMyInfo(token: String, profileId: Long?): UserData? {
         return try {
-            val response = authApi.getMyInfo("Bearer $token")
+            val response = authApi.getMyInfo("Bearer $token", profileId)
             if (response.isSuccessful) {
                 response.body()?.data
             } else {

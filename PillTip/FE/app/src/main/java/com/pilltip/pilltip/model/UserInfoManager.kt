@@ -28,6 +28,14 @@ object UserInfoManager {
         }
     }
 
+    fun selectProfile(context: Context, selectedId: Long) {
+        val current = getUserData(context) ?: return
+        val updatedList = current.userList?.map {
+            it.copy(isSelected = it.userId == selectedId)
+        }
+        saveUserData(context, current.copy(userList = updatedList ?: listOf()))
+    }
+
     fun clear(context: Context) {
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()

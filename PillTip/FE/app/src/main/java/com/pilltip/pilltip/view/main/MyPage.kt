@@ -11,7 +11,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,8 +29,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -71,7 +68,6 @@ import com.pilltip.pilltip.composable.MainComposable.DosageCard
 import com.pilltip.pilltip.composable.MainComposable.DrugManagementRowTab
 import com.pilltip.pilltip.composable.MainComposable.DrugSummaryCard
 import com.pilltip.pilltip.composable.MainComposable.HealthCard
-import com.pilltip.pilltip.composable.MainComposable.ProfileTagButton
 import com.pilltip.pilltip.composable.MainComposable.formatDate
 import com.pilltip.pilltip.composable.MainComposable.toDisplayStrings
 import com.pilltip.pilltip.composable.NextButton
@@ -243,7 +239,7 @@ fun MyPage(
             navController.navigate("MyDrugInfoPage")
         }
         MyPageMenuItem(text = "내 건강정보 관리") {
-            if(permission == true)
+            if (permission == true)
                 navController.navigate("MyHealthPage")
             else
                 navController.navigate("EssentialPage")
@@ -254,7 +250,7 @@ fun MyPage(
         MyPageMenuItem(text = "내 친구 목록") {
             navController.navigate("FriendListPage")
         }
-        if(gender == "FEMALE") {
+        if (gender == "FEMALE") {
             MyPageToggleItem(
                 text = "임신 여부",
                 isChecked = result,
@@ -333,12 +329,13 @@ fun MyPage(
                 color = gray500,
                 textAlign = TextAlign.Center
             ),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
                 .noRippleClickable {
-                if (!isSheetVisible) {
-                    isSheetVisible = true
+                    if (!isSheetVisible) {
+                        isSheetVisible = true
+                    }
                 }
-            }
         )
     }
     if (isSheetVisible) {
@@ -476,7 +473,7 @@ fun MyPageMenuItem(
             fontSize = 16.sp,
             fontFamily = pretendard,
             fontWeight = FontWeight(400),
-            color = if(text == "로그아웃") Color(0xFFEB2C28) else gray900,
+            color = if (text == "로그아웃") Color(0xFFEB2C28) else gray900,
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -564,58 +561,58 @@ fun MyDrugInfoPage(
                 }
             }
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.horizontalScroll(scrollState)
-        ) {
-            ProfileTagButton(
-                text = "처방약만",
-                selected = firstSelected,
-                onClick = { firstSelected = !firstSelected }
-            )
-            ProfileTagButton(
-                text = "복약 중인 약만",
-                selected = secondSelected,
-                onClick = { secondSelected = !secondSelected }
-            )
-            Image(
-                imageVector = ImageVector.vectorResource(R.drawable.ic_login_vertical_divider),
-                contentDescription = "디바이더",
-                modifier = Modifier
-                    .padding(horizontal = 6.dp)
-                    .width(1.dp)
-                    .background(gray200)
-                    .height(20.dp)
-            )
-            Box {
-                ProfileTagButton(
-                    text = sortOption,
-                    image = R.drawable.btn_blue_dropdown,
-                    selected = false,
-                    onClick = { expanded = true }
-                )
-
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier.background(Color.White)
-                ) {
-                    DropdownMenuItem(text = { Text("최신순") }, onClick = {
-                        sortOption = "최신순"
-                        expanded = false
-                    })
-                    DropdownMenuItem(text = { Text("오래된 순") }, onClick = {
-                        sortOption = "오래된 순"
-                        expanded = false
-                    })
-                    DropdownMenuItem(text = { Text("가나다순") }, onClick = {
-                        sortOption = "가나다순"
-                        expanded = false
-                    })
-                }
-            }
-        }
+//        Row(
+//            verticalAlignment = Alignment.CenterVertically,
+//            horizontalArrangement = Arrangement.spacedBy(4.dp),
+//            modifier = Modifier.horizontalScroll(scrollState)
+//        ) {
+//            ProfileTagButton(
+//                text = "처방약만",
+//                selected = firstSelected,
+//                onClick = { firstSelected = !firstSelected }
+//            )
+//            ProfileTagButton(
+//                text = "복약 중인 약만",
+//                selected = secondSelected,
+//                onClick = { secondSelected = !secondSelected }
+//            )
+//            Image(
+//                imageVector = ImageVector.vectorResource(R.drawable.ic_login_vertical_divider),
+//                contentDescription = "디바이더",
+//                modifier = Modifier
+//                    .padding(horizontal = 6.dp)
+//                    .width(1.dp)
+//                    .background(gray200)
+//                    .height(20.dp)
+//            )
+//            Box {
+//                ProfileTagButton(
+//                    text = sortOption,
+//                    image = R.drawable.btn_blue_dropdown,
+//                    selected = false,
+//                    onClick = { expanded = true }
+//                )
+//
+//                DropdownMenu(
+//                    expanded = expanded,
+//                    onDismissRequest = { expanded = false },
+//                    modifier = Modifier.background(Color.White)
+//                ) {
+//                    DropdownMenuItem(text = { Text("최신순") }, onClick = {
+//                        sortOption = "최신순"
+//                        expanded = false
+//                    })
+//                    DropdownMenuItem(text = { Text("오래된 순") }, onClick = {
+//                        sortOption = "오래된 순"
+//                        expanded = false
+//                    })
+//                    DropdownMenuItem(text = { Text("가나다순") }, onClick = {
+//                        sortOption = "가나다순"
+//                        expanded = false
+//                    })
+//                }
+//            }
+//        }
         HeightSpacer(10.dp)
         if (pillList.isEmpty()) {
             Text(
@@ -1007,13 +1004,28 @@ fun EssentialInfoPage(
                                 sensitiveViewModel.updateSensitivePermissions()
                                 sensitiveViewModel.deleteAllSensitiveInfo(
                                     onSuccess = {
-                                        viewModel.fetchMyInfo(TokenManager.getAccessToken(context).toString()) { userData ->
+                                        viewModel.fetchMyInfo(
+                                            TokenManager.getAccessToken(context)
+                                            .toString(),
+                                            UserInfoManager
+                                                .getUserData(context)
+                                                ?.userList
+                                                ?.find { it.isSelected }
+                                                ?.userId) { userData ->
                                             UserInfoManager.saveUserData(context, userData)
-                                            Toast.makeText(context, "모든 데이터가 파기처리 되었습니다", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                "모든 데이터가 파기처리 되었습니다",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
                                     },
                                     onFailure = {
-                                        Toast.makeText(context, "삭제 실패, 다시 시도해주세요", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "삭제 실패, 다시 시도해주세요",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
 
                                     }
                                 )

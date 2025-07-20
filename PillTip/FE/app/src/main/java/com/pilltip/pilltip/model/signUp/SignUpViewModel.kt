@@ -1,12 +1,14 @@
 package com.pilltip.pilltip.model.signUp
 
 import android.app.Activity
+import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.pilltip.pilltip.model.UserInfoManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -18,7 +20,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SignUpViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
     private val _signUpData = mutableStateOf(SignUpData())
@@ -35,6 +38,23 @@ class SignUpViewModel @Inject constructor(
 
     private val _userData = mutableStateOf<UserData?>(null)
     val userData: State<UserData?> = _userData
+
+    private val _isMainProfile = MutableStateFlow(false)
+    val isMainProfile: StateFlow<Boolean> = _isMainProfile
+
+    fun updateIsMainProfile(userData: UserData?) {
+        val isMain = userData?.userList?.find { it.isSelected }?.isMain == true
+        _isMainProfile.value = isMain
+    }
+
+    fun loadUserData(context: Context) {
+        _userData.value = UserInfoManager.getUserData(context)
+    }
+
+    fun updateUserData(context: Context, newUserData: UserData) {
+        UserInfoManager.saveUserData(context, newUserData)
+        _userData.value = newUserData
+    }
 
     /*값 업데이트*/
     fun updateLoginType(type: LoginType) {
@@ -53,7 +73,7 @@ class SignUpViewModel @Inject constructor(
         _signUpData.value = _signUpData.value.copy(password = password)
     }
 
-    fun updateTermsOfServices(agreed: Boolean){
+    fun updateTermsOfServices(agreed: Boolean) {
         _signUpData.value = _signUpData.value.copy(term = agreed)
     }
 
@@ -97,7 +117,8 @@ class SignUpViewModel @Inject constructor(
 
     fun logSignUpData(tag: String = "SignUpData") {
         val data = _signUpData.value
-        Log.d(tag, """
+        Log.d(
+            tag, """
         - loginType: ${data.loginType}
         - token: ${data.token}
         - provider: ${data.provider}
@@ -112,7 +133,8 @@ class SignUpViewModel @Inject constructor(
         - weight: ${data.weight}
         - interest: ${data.interest}
         - phone: ${data.phone}
-    """.trimIndent())
+    """.trimIndent()
+        )
     }
 
     fun completeSignUp(
@@ -218,9 +240,9 @@ class SignUpViewModel @Inject constructor(
         }
     }
 
-    fun fetchMyInfo(token: String, onSuccess: (UserData) -> Unit) {
+    fun fetchMyInfo(token: String, profileId: Long? = null, onSuccess: (UserData) -> Unit) {
         viewModelScope.launch {
-            val info = authRepository.getMyInfo(token)
+            val info = authRepository.getMyInfo(token, profileId)
             info?.let {
                 _userData.value = it
                 onSuccess(it)
@@ -248,6 +270,21 @@ class SignUpViewModel @Inject constructor(
         }
     }
 
+    fun deleteProfile(
+        token: String,
+        profileId: Long,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                profileRepository.deleteProfile(token, profileId)
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "프로필 삭제 중 오류가 발생했어요.")
+            }
+        }
+    }
 }
 
 @HiltViewModel
@@ -313,7 +350,7 @@ class PhoneAuthViewModel @Inject constructor(
                 startTimer()
                 onSent()
             },
-            onVerificationCompleted = {credential, code ->
+            onVerificationCompleted = { credential, code ->
                 val autoCode = code
                 if (!autoCode.isNullOrEmpty()) {
                     _code.value = autoCode

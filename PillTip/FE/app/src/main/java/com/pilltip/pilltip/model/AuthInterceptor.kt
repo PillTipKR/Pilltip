@@ -15,3 +15,24 @@ class AuthInterceptor(private val context: Context) : Interceptor {
         return chain.proceed(requestBuilder.build())
     }
 }
+
+class ProfileIdInterceptor(
+    private val context: Context
+) : Interceptor {
+
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        val requestBuilder = originalRequest.newBuilder()
+
+        val selectedProfileId = UserInfoManager.getUserData(context)
+            ?.userList
+            ?.firstOrNull { it.isSelected }
+            ?.userId
+
+        selectedProfileId?.let {
+            requestBuilder.addHeader("X-Profile-Id", it.toString())
+        }
+
+        return chain.proceed(requestBuilder.build())
+    }
+}

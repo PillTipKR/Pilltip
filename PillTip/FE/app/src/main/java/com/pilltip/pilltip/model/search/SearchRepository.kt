@@ -662,10 +662,16 @@ interface UserProfileApi {
     suspend fun updatePregnantStatus(
         @Body request: PregnantUpdateRequest
     ): Response<PregnantUpdateResponse>
+
+    @POST("/api/user-profile/create")
+    suspend fun createProfile(
+        @Body request: CreateProfileRequest
+    ): CreateProfileResponse
 }
 
 interface UserProfileRepository {
     suspend fun updatePregnantStatus(pregnant: Boolean): PregnantUpdateResponse
+    suspend fun createProfile(request: CreateProfileRequest): CreateProfileResponse
 }
 
 class UserProfileRepositoryImpl @Inject constructor(
@@ -679,6 +685,10 @@ class UserProfileRepositoryImpl @Inject constructor(
             val errorMsg = response.errorBody()?.string() ?: "알 수 없는 오류"
             throw Exception(errorMsg)
         }
+    }
+
+    override suspend fun createProfile(request: CreateProfileRequest): CreateProfileResponse {
+        return api.createProfile(request)
     }
 }
 

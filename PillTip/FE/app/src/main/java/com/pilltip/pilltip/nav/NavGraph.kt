@@ -20,6 +20,7 @@ import com.pilltip.pilltip.model.search.LogViewModel
 import com.pilltip.pilltip.model.search.ReviewViewModel
 import com.pilltip.pilltip.model.search.SearchHiltViewModel
 import com.pilltip.pilltip.model.search.SensitiveViewModel
+import com.pilltip.pilltip.model.search.UserProfileViewModel
 import com.pilltip.pilltip.model.signUp.SignUpViewModel
 import com.pilltip.pilltip.view.auth.FindMyInfoPage
 import com.pilltip.pilltip.view.auth.IdPage
@@ -31,6 +32,8 @@ import com.pilltip.pilltip.view.auth.PhoneAuthPage
 import com.pilltip.pilltip.view.auth.ProfilePage
 import com.pilltip.pilltip.view.auth.SelectPage
 import com.pilltip.pilltip.view.auth.SplashPage
+import com.pilltip.pilltip.view.friend.ChildProfilePage
+import com.pilltip.pilltip.view.friend.ChildrenPage
 import com.pilltip.pilltip.view.friend.FriendAcceptPage
 import com.pilltip.pilltip.view.friend.FriendListPage
 import com.pilltip.pilltip.view.main.DURLoadingPage
@@ -64,7 +67,8 @@ fun NavGraph(
     searchHiltViewModel: SearchHiltViewModel,
     logViewModel: LogViewModel = viewModel(),
     sensitiveViewModel: SensitiveViewModel,
-    reviewViewModel: ReviewViewModel
+    reviewViewModel: ReviewViewModel,
+    userProfileViewModel: UserProfileViewModel
 ) {
     val navController = rememberNavController()
     val myPageNavController = rememberNavController()
@@ -133,6 +137,14 @@ fun NavGraph(
 
         composable("NotificationPage") {
             NotificationPage(navController, searchHiltViewModel)
+        }
+
+        composable("ChildrenPage") {
+            ChildrenPage(navController, signUpViewModel)
+        }
+
+        composable("ChildProfilePage") {
+            ChildProfilePage(navController, userProfileViewModel, signUpViewModel)
         }
 
         /* Search */
