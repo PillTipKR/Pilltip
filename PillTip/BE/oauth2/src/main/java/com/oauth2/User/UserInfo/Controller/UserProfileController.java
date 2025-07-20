@@ -2,11 +2,8 @@ package com.oauth2.User.UserInfo.Controller;
 
 import com.oauth2.Account.Dto.ApiResponse;
 import com.oauth2.Account.Service.AccountService;
-import com.oauth2.User.UserInfo.Dto.PregnantRequest;
-import com.oauth2.User.UserInfo.Dto.ProfileRequest;
+import com.oauth2.User.UserInfo.Dto.*;
 import com.oauth2.Account.Entity.Account;
-import com.oauth2.User.UserInfo.Dto.UserProfilePregnantResponse;
-import com.oauth2.User.UserInfo.Dto.UserResponse;
 import com.oauth2.User.UserInfo.Entity.Gender;
 import com.oauth2.User.UserInfo.Entity.User;
 import com.oauth2.User.UserInfo.Entity.UserProfile;
@@ -89,7 +86,7 @@ public class UserProfileController {
     @PostMapping("/create")
     public ResponseEntity<ApiResponse<UserResponse>> createProfile(
             @AuthenticationPrincipal Account account,
-            @RequestBody ProfileRequest profileRequest) {
+            @RequestBody ChildProfileRequest profileRequest) {
         return ResponseEntity.status(201)
                 .body(ApiResponse.success(userProfileService.createProfile(profileRequest, account.getId())));
     }
