@@ -52,7 +52,8 @@ public class SecurityConfig {
                                 "/static/**", "/webjars/**", "/favicon.ico",
                                 "/api/auth/signup", "/api/auth/login", "/api/auth/check-duplicate",
                                 "/api/auth/refresh", "/api/auth/social-login", "/api/questionnaire/public/**",
-                                "/profile/**", "/api/friend/inviting/**", "/invite.html"
+                                "/profile/**", "/api/friend/inviting/**", "/invite.html",
+                                "/api/questionnaire/qr-url/all"
                         ).permitAll()
                         // 나머지 경로는 인증 필요
                         .anyRequest().authenticated()

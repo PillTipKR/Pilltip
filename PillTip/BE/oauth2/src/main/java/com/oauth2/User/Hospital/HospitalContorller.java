@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 public class HospitalContorller {
     private final HospitalService hospitalService;
     private final HospitalRepository hospitalRepository;
+    private final HospitalAccessTokenService tokenService;
 
     // 병원 등록
     @PostMapping("")
@@ -32,6 +33,9 @@ public class HospitalContorller {
                 .address(request.getAddress())
                 .build();
         Hospital saved = hospitalRepository.save(hospital);
+
+        tokenService.generateDailyToken(hospitalCode);
+
         return ResponseEntity.ok(ApiResponse.success(HospitalMessageConstants.HOSPITAL_CREATE_SUCCESS, saved));
     }
 
@@ -44,6 +48,7 @@ public class HospitalContorller {
             hospital.setName(request.getName());
             hospital.setAddress(request.getAddress());
             Hospital updated = hospitalRepository.save(hospital);
+            tokenService.generateDailyToken(hospital.getHospitalCode());
             return ResponseEntity.ok(ApiResponse.success(HospitalMessageConstants.HOSPITAL_UPDATE_SUCCESS, updated));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(HospitalMessageConstants.HOSPITAL_NOT_FOUND, null));
@@ -58,7 +63,10 @@ public class HospitalContorller {
         if (!hospitalRepository.existsById(id)) {
             return ResponseEntity.badRequest().body(ApiResponse.error(HospitalMessageConstants.HOSPITAL_NOT_FOUND, null));
         }
+        Hospital hospital = hospitalRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException(HospitalMessageConstants.HOSPITAL_NOT_FOUND));
         hospitalRepository.deleteById(id);
+        tokenService.deleteTokenByHospitalCode(hospital.getHospitalCode());
         return ResponseEntity.ok(ApiResponse.success(HospitalMessageConstants.HOSPITAL_DELETE_SUCCESS, null));
     }
 
@@ -70,6 +78,20 @@ public class HospitalContorller {
             .map(h -> new HospitalSimpleResponse(h.getId(), h.getHospitalCode(), h.getName(), h.getAddress()))
             .toList();
         return ResponseEntity.ok(ApiResponse.success(HospitalMessageConstants.HOSPITAL_SEARCH_SUCCESS, result));
+    }
+    
+    // 병원별 일일 접근 토큰 조회
+    @GetMapping("/{hospitalCode}/access-token")
+    public ResponseEntity<ApiResponse<String>> getAccessToken(@PathVariable String hospitalCode) {
+        try {
+            String accessToken = tokenService.getCurrentTokenByHospitalCode(hospitalCode)
+                .orElseThrow(() -> new IllegalArgumentException(HospitalMessageConstants.HOSPITAL_NOT_FOUND));
+            return ResponseEntity.ok(ApiResponse.success("접근 토큰 조회 성공", accessToken));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("해당 병원의 접근 토큰을 찾을 수 없습니다.", null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("접근 토큰 조회에 실패했습니다.", null));
+        }
     }
 
     // 병원 등록/수정 요청 DTO
