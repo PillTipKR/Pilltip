@@ -4,6 +4,7 @@ import com.oauth2.Account.Dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/hospital")
@@ -84,13 +85,37 @@ public class HospitalContorller {
     @GetMapping("/{hospitalCode}/access-token")
     public ResponseEntity<ApiResponse<String>> getAccessToken(@PathVariable String hospitalCode) {
         try {
-            String accessToken = tokenService.getCurrentTokenByHospitalCode(hospitalCode)
-                .orElseThrow(() -> new IllegalArgumentException(HospitalMessageConstants.HOSPITAL_NOT_FOUND));
+            System.out.println("=== 접근 토큰 조회 시작 ===");
+            System.out.println("요청된 hospitalCode: " + hospitalCode);
+            
+            // 1. 병원 존재 여부 확인
+            var hospitalOpt = hospitalRepository.findByHospitalCode(hospitalCode);
+            if (!hospitalOpt.isPresent()) {
+                System.out.println("병원을 찾을 수 없음: " + hospitalCode);
+                return ResponseEntity.badRequest().body(ApiResponse.error("해당 병원을 찾을 수 없습니다.", null));
+            }
+            System.out.println("병원 찾음: " + hospitalOpt.get().getName());
+            
+            // 2. 토큰 조회 또는 생성
+            var tokenOpt = tokenService.getCurrentTokenByHospitalCode(hospitalCode);
+            String accessToken;
+            
+            if (tokenOpt.isPresent()) {
+                accessToken = tokenOpt.get();
+                System.out.println("기존 토큰 사용: " + accessToken.substring(0, 8) + "...");
+            } else {
+                System.out.println("토큰이 없어서 새로 생성");
+                accessToken = tokenService.generateDailyToken(hospitalCode);
+                System.out.println("새 토큰 생성: " + accessToken.substring(0, 8) + "...");
+            }
+            
+            System.out.println("=== 접근 토큰 조회 성공 ===");
             return ResponseEntity.ok(ApiResponse.success("접근 토큰 조회 성공", accessToken));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("해당 병원의 접근 토큰을 찾을 수 없습니다.", null));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("접근 토큰 조회에 실패했습니다.", null));
+            System.out.println("=== 접근 토큰 조회 실패 ===");
+            System.out.println("에러 메시지: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(ApiResponse.error("접근 토큰 조회에 실패했습니다: " + e.getMessage(), null));
         }
     }
 
@@ -98,10 +123,22 @@ public class HospitalContorller {
     public static class HospitalRequest {
         private String name;
         private String address;
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-        public String getAddress() { return address; }
-        public void setAddress(String address) { this.address = address; }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getAddress() {
+            return address;
+        }
+
+        public void setAddress(String address) {
+            this.address = address;
+        }
     }
 
     public static class HospitalSimpleResponse {

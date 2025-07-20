@@ -52,6 +52,7 @@ public class SecurityConfig {
                                 "/static/**", "/webjars/**", "/favicon.ico",
                                 "/api/auth/signup", "/api/auth/login", "/api/auth/check-duplicate",
                                 "/api/auth/refresh", "/api/auth/social-login", "/api/questionnaire/public/**",
+                                "/questionnaire/public/**",
                                 "/profile/**", "/api/friend/inviting/**", "/invite.html",
                                 "/api/questionnaire/qr-url/all"
                         ).permitAll()
