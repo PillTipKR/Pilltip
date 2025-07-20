@@ -668,6 +668,7 @@ fun MyQuestionnairePage(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    HeightSpacer(150.dp)
                     Image(
                         painter = painterResource(R.drawable.ic_questionnaire_none),
                         contentDescription = "문진표 없음"
@@ -709,7 +710,7 @@ fun MyQuestionnairePage(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "문진표 추가하기",
+                            text = "민감정보 제공 동의하기",
                             style = TextStyle(
                                 fontSize = 14.sp,
                                 fontFamily = pretendard,

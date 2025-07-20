@@ -241,6 +241,7 @@ class SearchHiltViewModel @Inject constructor(
             }
         }
     }
+
     fun clearPillDetail() {
         _pillDetail.value = null
     }
@@ -345,11 +346,13 @@ class SearchHiltViewModel @Inject constructor(
                 if (response.status == "success") {
                     onSuccess(response.data)
 
-                    val latest = dosageLogRepo.getDailyDosageLog(_selectedDate.value.toString()).data
+                    val latest =
+                        dosageLogRepo.getDailyDosageLog(_selectedDate.value.toString()).data
                     _dailyDosageLog.value = latest
 
                     selectedDrugLog?.let { selected ->
-                        val updated = latest.perDrugLogs.find { it.medicationName == selected.medicationName }
+                        val updated =
+                            latest.perDrugLogs.find { it.medicationName == selected.medicationName }
                         selectedDrugLog = updated
                     }
                 } else {
@@ -406,7 +409,11 @@ class SearchHiltViewModel @Inject constructor(
     private val _updatedProfile = MutableStateFlow<UserProfileData?>(null)
     val updatedProfile: StateFlow<UserProfileData?> = _updatedProfile.asStateFlow()
 
-    fun updatePersonalInfo(request: PersonalInfoUpdateRequest, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun updatePersonalInfo(
+        request: PersonalInfoUpdateRequest,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         viewModelScope.launch {
             try {
                 val result = personalInfoRepo.updatePersonalInfo(request)
@@ -561,8 +568,8 @@ class SearchHiltViewModel @Inject constructor(
 class SensitiveViewModel @Inject constructor(
     private val permissionRepository: PermissionRepository,
     private val sensitiveInfoRepository: SensitiveInfoRepository,
-    private val qrRepository: QrRepository
-
+    private val qrRepository: QrRepository,
+    private val pregnantRepository: UserProfileRepository
 ) : ViewModel() {
 
     var realName by mutableStateOf("")
@@ -669,8 +676,10 @@ class SensitiveViewModel @Inject constructor(
                 address = response.address
                 phoneNumber = response.phoneNumber
                 allergyInfo = response.sensitiveInfo.allergyInfo.map { AllergyInfo(it, true) }
-                chronicDiseaseInfo = response.sensitiveInfo.chronicDiseaseInfo.map { ChronicDiseaseInfo(it, true) }
-                surgeryHistoryInfo = response.sensitiveInfo.surgeryHistoryInfo.map { SurgeryHistoryInfo(it, true) }
+                chronicDiseaseInfo =
+                    response.sensitiveInfo.chronicDiseaseInfo.map { ChronicDiseaseInfo(it, true) }
+                surgeryHistoryInfo =
+                    response.sensitiveInfo.surgeryHistoryInfo.map { SurgeryHistoryInfo(it, true) }
 
                 Log.d("SensitiveSubmit", "업데이트 성공")
                 onSuccess()
@@ -708,6 +717,36 @@ class SensitiveViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e("SensitiveDelete", "삭제 실패: ${e.message}")
                 onFailure(e)
+            }
+        }
+    }
+
+    private val _pregnant = MutableStateFlow(false)
+    val pregnant: StateFlow<Boolean> = _pregnant
+    fun initPregnant(pregnantValue: Boolean) {
+        _pregnant.value = pregnantValue
+    }
+
+    private val _pregnantResult = MutableStateFlow<Result<PregnantUpdateResponse>?>(null)
+    val pregnantResult: StateFlow<Result<PregnantUpdateResponse>?> = _pregnantResult
+
+    fun updatePregnantStatus(
+        newValue: Boolean,
+        onSuccess: () -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = pregnantRepository.updatePregnantStatus(newValue)
+                if (response.status == "success") {
+                    _pregnant.value = response.data?.pregnant ?: false
+                    onSuccess()
+                } else {
+                    onError(Exception(response.message ?: "임신 여부 변경 실패"))
+                }
+            } catch (e: Exception) {
+                Log.e("SensitiveViewModel", "임신 여부 업데이트 실패", e)
+                onError(e)
             }
         }
     }
@@ -788,6 +827,7 @@ class ReviewViewModel @Inject constructor(
             )
         }
     }
+
     fun clearError() {
         _errorMessage.value = null
     }
@@ -1132,5 +1172,17 @@ object RepositoryModule {
         return FriendRepositoryImpl(api)
     }
 
+    /* 임신 여부 */
+    @Provides
+    fun provideUserProfileApi(@Named("SearchRetrofit") retrofit: Retrofit): UserProfileApi {
+        return retrofit.create(UserProfileApi::class.java)
+    }
+
+    @Provides
+    fun provideUserProfileRepository(
+        api: UserProfileApi
+    ): UserProfileRepository {
+        return UserProfileRepositoryImpl(api)
+    }
 
 }

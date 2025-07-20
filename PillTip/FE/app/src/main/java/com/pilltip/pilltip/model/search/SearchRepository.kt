@@ -2,6 +2,7 @@ package com.pilltip.pilltip.model.search
 
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -12,6 +13,7 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Url
+import javax.inject.Inject
 
 /**
  * 약품명 자동완성 API
@@ -652,6 +654,31 @@ class FriendRepositoryImpl(
 
     override suspend fun getFriendList(): List<FriendListDto> {
         return api.getFriendList().data
+    }
+}
+
+interface UserProfileApi {
+    @PUT("/api/user-profile/pregnant")
+    suspend fun updatePregnantStatus(
+        @Body request: PregnantUpdateRequest
+    ): Response<PregnantUpdateResponse>
+}
+
+interface UserProfileRepository {
+    suspend fun updatePregnantStatus(pregnant: Boolean): PregnantUpdateResponse
+}
+
+class UserProfileRepositoryImpl @Inject constructor(
+    private val api: UserProfileApi
+) : UserProfileRepository {
+    override suspend fun updatePregnantStatus(pregnant: Boolean): PregnantUpdateResponse {
+        val response = api.updatePregnantStatus(PregnantUpdateRequest(pregnant))
+        if (response.isSuccessful) {
+            return response.body() ?: throw Exception("응답이 비어 있습니다")
+        } else {
+            val errorMsg = response.errorBody()?.string() ?: "알 수 없는 오류"
+            throw Exception(errorMsg)
+        }
     }
 }
 

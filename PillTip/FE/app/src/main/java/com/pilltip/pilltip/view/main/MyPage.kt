@@ -53,7 +53,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
@@ -108,6 +107,8 @@ fun MyPage(
 ) {
     HandleBackPressToExitApp(navController)
     val systemUiController = rememberSystemUiController()
+    val context = LocalContext.current
+
     SideEffect {
         systemUiController.setStatusBarColor(
             color = Color.White,
@@ -117,10 +118,13 @@ fun MyPage(
     }
     LaunchedEffect(Unit) {
         sensitiveViewModel.loadPermissions()
+        val userPregnant = UserInfoManager.getUserData(context)?.pregnant ?: false
+        sensitiveViewModel.initPregnant(userPregnant)
     }
-    val context = LocalContext.current
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-    val nickname = UserInfoManager.getUserData(LocalContext.current)?.nickname
+    val nickname = UserInfoManager.getUserData(context)?.nickname
+    val gender = UserInfoManager.getUserData(context)?.gender
+
+    val result by sensitiveViewModel.pregnant.collectAsState()
     val scope = rememberCoroutineScope()
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var isSheetVisible by remember { mutableStateOf(false) }
@@ -147,7 +151,6 @@ fun MyPage(
     val selectedDate by remember { mutableStateOf(LocalDate.now()) }
     val logData by searchHiltViewModel.dailyDosageLog.collectAsState()
     val dateText = formatDate(selectedDate)
-    val coroutineScope = rememberCoroutineScope()
     val notificationPermission = Manifest.permission.POST_NOTIFICATIONS
     val isNotificationGranted = ContextCompat.checkSelfPermission(
         context, notificationPermission
@@ -196,7 +199,6 @@ fun MyPage(
                                 context,
                                 permission
                             ) == PackageManager.PERMISSION_GRANTED -> {
-                                // 이미 권한 있음 → 바로 갤러리 실행
                                 galleryLauncher.launch("image/*")
                             }
 
@@ -252,6 +254,32 @@ fun MyPage(
         MyPageMenuItem(text = "내 친구 목록") {
             navController.navigate("FriendListPage")
         }
+        if(gender == "FEMALE") {
+            MyPageToggleItem(
+                text = "임신 여부",
+                isChecked = result,
+                onCheckedChange = { newValue ->
+                    sensitiveViewModel.updatePregnantStatus(
+                        newValue,
+                        onSuccess = {
+                            Toast.makeText(
+                                context,
+                                if (newValue) "${nickname}님! 임신 축하드려요!" else "임신 설정이 해제되었어요",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        onError = {
+                            Toast.makeText(
+                                context,
+                                it.message ?: "설정 중 오류가 발생했어요",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    )
+                }
+            )
+        }
+
         HeightSpacer(48.dp)
         Text(
             text = "알림",

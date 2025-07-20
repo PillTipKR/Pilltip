@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -291,9 +293,19 @@ fun ReviewSection(
     id: Long
 ) {
     val reviewListData by reviewViewModel.reviewListData.collectAsState()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         reviewViewModel.loadReviews(id)
+    }
+
+    LaunchedEffect(remember { derivedStateOf { listState.firstVisibleItemIndex } }) {
+        val lastVisibleItemIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+        val totalItemCount = reviewListData?.content?.size ?: 0
+
+        if (lastVisibleItemIndex == totalItemCount - 1) {
+            reviewViewModel.loadReviews(id)
+        }
     }
     val localHeight = LocalConfiguration.current.screenHeightDp
     LazyColumn(

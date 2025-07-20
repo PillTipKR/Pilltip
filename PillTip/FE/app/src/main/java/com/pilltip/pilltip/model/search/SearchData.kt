@@ -623,3 +623,24 @@ data class ReviewResponse<T>(
     val message: String?,
     val data: T
 )
+
+/**
+ * 임신 여부 업데이트
+ */
+// PregnantUpdateRequest.kt
+data class PregnantUpdateRequest(
+    val pregnant: Boolean
+)
+
+// PregnantUpdateResponse.kt
+data class PregnantUpdateResponse(
+    val status: String,
+    val message: String?,
+    val data: PregnantUserData?
+)
+
+data class PregnantUserData(
+    val age: Int,
+    val gender: String,
+    val pregnant: Boolean
+)
