@@ -1,5 +1,6 @@
 package com.pilltip.pilltip.view.auth.logic
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -38,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -58,9 +58,6 @@ import com.pilltip.pilltip.composable.WidthSpacer
 import com.pilltip.pilltip.composable.noRippleClickable
 import com.pilltip.pilltip.model.signUp.SignUpViewModel
 import com.pilltip.pilltip.ui.theme.gray100
-import com.pilltip.pilltip.ui.theme.gray200
-import com.pilltip.pilltip.ui.theme.gray400
-import com.pilltip.pilltip.ui.theme.gray500
 import com.pilltip.pilltip.ui.theme.pretendard
 import com.pilltip.pilltip.ui.theme.primaryColor
 
@@ -72,6 +69,7 @@ fun TermBottomSheet(
     onDismiss: () -> Unit
 ) {
     var isEssentialChecked by remember { mutableStateOf(false) }
+    var isAgeChecked by remember { mutableStateOf(false) }
     var isOptionalChecked by remember { mutableStateOf(false) }
     var isEssentialExpanded by remember { mutableStateOf(false) }
     var isOptionalExpanded by remember { mutableStateOf(false) }
@@ -139,7 +137,7 @@ fun TermBottomSheet(
                 )
                 WidthSpacer(8.dp)
                 Text(
-                    text = "[필수] 서비스 이용약관",
+                    text = "[필수] 필팁 서비스 이용약관 동의",
                     style = TextStyle(
                         fontSize = 14.sp,
                         fontFamily = pretendard,
@@ -163,6 +161,34 @@ fun TermBottomSheet(
             }
             AnimatedVisibility(visible = isEssentialExpanded) {
                 EssentialTerms()
+            }
+            Row(
+                modifier = Modifier.padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(imageVector =
+                    if (!isAgeChecked)
+                        ImageVector.vectorResource(R.drawable.btn_gray_checkmark)
+                    else
+                        ImageVector.vectorResource(R.drawable.btn_blue_checkmark),
+                    contentDescription = "checkBtn",
+                    modifier = Modifier
+                        .size(20.dp, 20.dp)
+                        .noRippleClickable { isAgeChecked = !isAgeChecked }
+                )
+                WidthSpacer(8.dp)
+                Text(
+                    text = "[필수] 만 14세 이상입니다.",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontFamily = pretendard,
+                        fontWeight = FontWeight(500),
+                        color = Color(0xFF686D78),
+                    ),
+                    modifier = Modifier.noRippleClickable {
+                        isAgeChecked = !isAgeChecked
+                    }
+                )
             }
             Row(
                 modifier = Modifier.padding(vertical = 10.dp),
@@ -211,9 +237,9 @@ fun TermBottomSheet(
                     .padding(vertical = 16.dp)
                     .height(58.dp),
                 text = "확인",
-                buttonColor = if (isEssentialChecked) Color(0xFF348ADF) else Color(0xFFCADCF5),
+                buttonColor = if (isEssentialChecked && isAgeChecked) Color(0xFF348ADF) else Color(0xFFCADCF5),
                 onClick = {
-                    if(isEssentialChecked){
+                    if(isEssentialChecked && isAgeChecked){
                         vm.updateTermsOfServices(true)
                         onDismiss()
                         navController.navigate("PhoneAuthPage")
@@ -254,6 +280,7 @@ enum class InputType {
     TEXT, EMAIL, PASSWORD, NUMBER
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun OtpInputField(
     otpText: String,
@@ -264,11 +291,10 @@ fun OtpInputField(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     BoxWithConstraints(modifier = modifier) {
-        val boxSize = maxWidth / 7 // 여백 고려해 6칸 + 패딩 맞춤
+        val boxSize = maxWidth / 7
         val space = (maxWidth - boxSize * 6) / 5
 
         Box {
-            // 실질적으로 입력을 받는 투명 TextField
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

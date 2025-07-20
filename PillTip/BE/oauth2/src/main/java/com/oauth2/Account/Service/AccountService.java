@@ -13,7 +13,6 @@ import java.nio.file.AccessDeniedException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -64,6 +63,9 @@ public class AccountService {
                     new UserListDto(
                             users.getId(),
                             users.getNickname(),
+                            users.getUserProfile().getAge(),
+                            users.getUserProfile().getGender().name(),
+                            users.getUserProfile().getBirthDate().toString(),
                             users.isMain(),
                             users.getId().equals(profileId)
                     )

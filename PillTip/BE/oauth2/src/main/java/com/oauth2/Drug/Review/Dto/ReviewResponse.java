@@ -1,14 +1,18 @@
 package com.oauth2.Drug.Review.Dto;
 
 import com.oauth2.Drug.Review.Domain.Review;
-import com.oauth2.Drug.Review.Domain.ReviewImage;
 import com.oauth2.Drug.Review.Domain.TagType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
 
 @Data
@@ -44,13 +48,33 @@ public class ReviewResponse {
                 .content(review.getContent())
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
-                .imageUrls(review.getImages().stream().map(ReviewImage::getImageUrl).toList())
+                .imageUrls(
+                        review.getImages()
+                                .stream()
+                                .map(image -> {
+                                    try {
+                                        return encodeImageToBase64(image.getImageUrl());
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })
+                                .toList()
+                )
                 .efficacyTags(getTagsByType(review, TagType.EFFICACY))
                 .sideEffectTags(getTagsByType(review, TagType.SIDE_EFFECT))
                 .otherTags(getTagsByType(review, TagType.OTHER))
                 .isMine(review.getUser().getId().equals(userId))
                 .isLiked(isLiked)
                 .build();
+    }
+
+    private static String encodeImageToBase64(String imagePath) throws IOException {
+        String w = "upload";
+        Path path = Paths.get(w+imagePath);
+        String mimeType = Files.probeContentType(path); // 예: image/jpeg
+        byte[] bytes = Files.readAllBytes(path);
+        String base64 = Base64.getEncoder().encodeToString(bytes);
+        return "data:" + mimeType + ";base64," + base64;
     }
 
     private static List<String> getTagsByType(Review review, TagType type) {

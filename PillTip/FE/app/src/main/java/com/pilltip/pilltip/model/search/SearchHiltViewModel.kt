@@ -1,6 +1,7 @@
 package com.pilltip.pilltip.model.search
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -8,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
 import com.pilltip.pilltip.model.AuthInterceptor
 import dagger.Module
 import dagger.Provides
@@ -18,11 +20,17 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.File
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Named
@@ -233,6 +241,7 @@ class SearchHiltViewModel @Inject constructor(
             }
         }
     }
+
     fun clearPillDetail() {
         _pillDetail.value = null
     }
@@ -337,11 +346,13 @@ class SearchHiltViewModel @Inject constructor(
                 if (response.status == "success") {
                     onSuccess(response.data)
 
-                    val latest = dosageLogRepo.getDailyDosageLog(_selectedDate.value.toString()).data
+                    val latest =
+                        dosageLogRepo.getDailyDosageLog(_selectedDate.value.toString()).data
                     _dailyDosageLog.value = latest
 
                     selectedDrugLog?.let { selected ->
-                        val updated = latest.perDrugLogs.find { it.medicationName == selected.medicationName }
+                        val updated =
+                            latest.perDrugLogs.find { it.medicationName == selected.medicationName }
                         selectedDrugLog = updated
                     }
                 } else {
@@ -398,7 +409,11 @@ class SearchHiltViewModel @Inject constructor(
     private val _updatedProfile = MutableStateFlow<UserProfileData?>(null)
     val updatedProfile: StateFlow<UserProfileData?> = _updatedProfile.asStateFlow()
 
-    fun updatePersonalInfo(request: PersonalInfoUpdateRequest, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun updatePersonalInfo(
+        request: PersonalInfoUpdateRequest,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         viewModelScope.launch {
             try {
                 val result = personalInfoRepo.updatePersonalInfo(request)
@@ -553,8 +568,8 @@ class SearchHiltViewModel @Inject constructor(
 class SensitiveViewModel @Inject constructor(
     private val permissionRepository: PermissionRepository,
     private val sensitiveInfoRepository: SensitiveInfoRepository,
-    private val qrRepository: QrRepository
-
+    private val qrRepository: QrRepository,
+    private val pregnantRepository: UserProfileRepository
 ) : ViewModel() {
 
     var realName by mutableStateOf("")
@@ -661,8 +676,10 @@ class SensitiveViewModel @Inject constructor(
                 address = response.address
                 phoneNumber = response.phoneNumber
                 allergyInfo = response.sensitiveInfo.allergyInfo.map { AllergyInfo(it, true) }
-                chronicDiseaseInfo = response.sensitiveInfo.chronicDiseaseInfo.map { ChronicDiseaseInfo(it, true) }
-                surgeryHistoryInfo = response.sensitiveInfo.surgeryHistoryInfo.map { SurgeryHistoryInfo(it, true) }
+                chronicDiseaseInfo =
+                    response.sensitiveInfo.chronicDiseaseInfo.map { ChronicDiseaseInfo(it, true) }
+                surgeryHistoryInfo =
+                    response.sensitiveInfo.surgeryHistoryInfo.map { SurgeryHistoryInfo(it, true) }
 
                 Log.d("SensitiveSubmit", "업데이트 성공")
                 onSuccess()
@@ -700,6 +717,36 @@ class SensitiveViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e("SensitiveDelete", "삭제 실패: ${e.message}")
                 onFailure(e)
+            }
+        }
+    }
+
+    private val _pregnant = MutableStateFlow(false)
+    val pregnant: StateFlow<Boolean> = _pregnant
+    fun initPregnant(pregnantValue: Boolean) {
+        _pregnant.value = pregnantValue
+    }
+
+    private val _pregnantResult = MutableStateFlow<Result<PregnantUpdateResponse>?>(null)
+    val pregnantResult: StateFlow<Result<PregnantUpdateResponse>?> = _pregnantResult
+
+    fun updatePregnantStatus(
+        newValue: Boolean,
+        onSuccess: () -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = pregnantRepository.updatePregnantStatus(newValue)
+                if (response.status == "success") {
+                    _pregnant.value = response.data?.pregnant ?: false
+                    onSuccess()
+                } else {
+                    onError(Exception(response.message ?: "임신 여부 변경 실패"))
+                }
+            } catch (e: Exception) {
+                Log.e("SensitiveViewModel", "임신 여부 업데이트 실패", e)
+                onError(e)
             }
         }
     }
@@ -770,13 +817,122 @@ class ReviewViewModel @Inject constructor(
         }
     }
 
-    fun refreshReviews(drugId: Long) {
-        loadReviews(drugId = drugId, reset = true)
+    fun refreshReviews() {
+        if (currentDrugId != -1L) {
+            loadReviews(
+                drugId = currentDrugId,
+                reset = true,
+                sortKey = currentSortKey,
+                direction = currentDirection
+            )
+        }
     }
 
     fun clearError() {
         _errorMessage.value = null
     }
+
+    private val _createResult = MutableStateFlow<Long?>(null)
+    val createResult: StateFlow<Long?> = _createResult.asStateFlow()
+
+    private val _deleteResult = MutableStateFlow<String?>(null)
+    val deleteResult: StateFlow<String?> = _deleteResult.asStateFlow()
+
+    fun uriToFile(uri: Uri, context: Context): File? {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val tempFile = File.createTempFile("upload", ".jpg", context.cacheDir)
+        tempFile.outputStream().use { output ->
+            inputStream.copyTo(output)
+        }
+        return tempFile
+    }
+
+
+    fun createReview(
+        drugId: Long,
+        rating: Float,
+        content: String,
+        tags: ReviewTagRequest,
+        imageUris: List<Uri>,
+        context: Context,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+
+                val json = Gson().toJson(
+                    ReviewCreateRequest(drugId, rating, content, tags)
+                )
+                val reviewBody = json.toRequestBody("application/json; charset=utf-8".toMediaType())
+
+                val imageParts = imageUris.mapNotNull { uri ->
+                    val file = uriToFile(uri, context)
+                    file?.let {
+                        val requestFile = it.asRequestBody("image/*".toMediaType())
+                        MultipartBody.Part.createFormData("images", it.name, requestFile)
+                    }
+                }
+
+                val reviewId = reviewRepository.createReviewMultipart(reviewBody, imageParts)
+                _createResult.value = reviewId
+                refreshReviews()
+                onSuccess()
+            } catch (e: Exception) {
+                Log.e("ReviewCreate", "리뷰 등록 실패: ${e.message}")
+                onError(e.localizedMessage ?: "리뷰 등록 실패")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun deleteReview(
+        reviewId: Long,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                val message = reviewRepository.deleteReview(reviewId)
+                _deleteResult.value = message
+                refreshReviews()
+                onSuccess()
+            } catch (e: Exception) {
+                Log.e("ReviewDelete", "리뷰 삭제 실패: ${e.message}")
+                onError(e.localizedMessage ?: "리뷰 삭제 실패")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun likeReview(reviewId: Long) {
+        viewModelScope.launch {
+            _reviewListData.update { current ->
+                current?.copy(
+                    content = current.content.map { review ->
+                        if (review.id == reviewId) {
+                            val liked = !review.isLiked
+                            review.copy(
+                                isLiked = liked,
+                                likeCount = if (liked) review.likeCount + 1 else review.likeCount - 1
+                            )
+                        } else review
+                    }
+                )
+            }
+
+            try {
+                reviewRepository.likeReview(reviewId)
+            } catch (e: Exception) {
+                Log.e("LikeReview", "서버 통신 실패: ${e.message}")
+            }
+        }
+    }
+
 }
 
 @Module
@@ -1016,5 +1172,17 @@ object RepositoryModule {
         return FriendRepositoryImpl(api)
     }
 
+    /* 임신 여부 */
+    @Provides
+    fun provideUserProfileApi(@Named("SearchRetrofit") retrofit: Retrofit): UserProfileApi {
+        return retrofit.create(UserProfileApi::class.java)
+    }
+
+    @Provides
+    fun provideUserProfileRepository(
+        api: UserProfileApi
+    ): UserProfileRepository {
+        return UserProfileRepositoryImpl(api)
+    }
 
 }

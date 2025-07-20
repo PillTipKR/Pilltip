@@ -9,6 +9,7 @@ import com.oauth2.User.TakingPill.Entity.TakingPill;
 import com.oauth2.User.TakingPill.Repositoty.DosageLogRepository;
 import com.oauth2.User.TakingPill.Repositoty.DosageScheduleRepository;
 import com.oauth2.User.TakingPill.Repositoty.TakingPillRepository;
+import com.oauth2.User.UserInfo.Dto.ChildProfileRequest;
 import com.oauth2.User.UserInfo.Dto.ProfileRequest;
 import com.oauth2.User.UserInfo.Dto.UserResponse;
 import com.oauth2.User.UserInfo.Entity.*;
@@ -59,7 +60,7 @@ public class UserProfileService {
 
     //회원가입 요청 처리
     @Transactional
-    public UserResponse createProfile(ProfileRequest request, Long accountId) {
+    public UserResponse createProfile(ChildProfileRequest request, Long accountId) {
 
         try {
             User user = User.builder()
@@ -75,7 +76,7 @@ public class UserProfileService {
             logger.info("사용자 저장 완료 - UserId: {}", user.getId());
 
             logger.info("사용자 프로필 정보 생성 시작");
-            userSetting(user, request, false);
+            profileSetting(user, request, false);
 
             logger.info("최종 사용자 정보 저장");
 
@@ -86,6 +87,44 @@ public class UserProfileService {
             logger.error("프로필 생성 실패", e);
             throw e;
         }
+    }
+
+    private UserProfile createChildProfile(User user, ChildProfileRequest request) {
+        return UserProfile.builder()
+                .user(user)
+                .age(request.age())
+                .gender(Gender.valueOf(request.gender().toUpperCase()))
+                .birthDate(LocalDate.parse(request.birthDate()))
+                .height(new BigDecimal(request.height()))
+                .weight(new BigDecimal(request.weight()))
+                .phone("") // 전화번호는 받지 않음
+                .build();
+    }
+
+    public void profileSetting(User user, ChildProfileRequest request, boolean isMain) {
+        UserProfile userProfile = createChildProfile(user, request);
+        Interests userInterests = createChildInterests(user);
+        UserPermissions userPermissions = createUserPermissions(user);
+        UserLocation userLocation = createUserLocation(user);
+
+        user.setUserProfile(userProfile);
+        user.setInterests(userInterests);
+        user.setUserPermissions(userPermissions);
+        user.setUserLocation(userLocation);
+        user.setMain(isMain);
+
+    }
+
+    // 사용자 관심사 생성
+    private Interests createChildInterests(User user) {
+        return Interests.builder()
+                .user(user)
+                .diet(false)
+                .health(false)
+                .muscle(false)
+                .aging(false)
+                .nutrient(false)
+                .build();
     }
 
     // 사용자 프로필 생성

@@ -37,6 +37,7 @@ public class UserController {
         User user = accountService.findUserByProfileId(profileId, account.getId());
 
         try {
+            if(profileId==0) profileId=user.getId();
             User currentUser = userService.getCurrentUser(user.getId());
             List<UserListDto> userListDtos = accountService.getUserList(account.getId(),profileId);
 
