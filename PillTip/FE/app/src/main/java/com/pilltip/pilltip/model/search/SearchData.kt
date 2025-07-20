@@ -552,6 +552,38 @@ data class SortInfo(
 )
 
 /**
+ * 리뷰 작성
+ */
+data class ReviewCreateRequest(
+    val drugId: Long,
+    val rating: Float,
+    val content: String,
+    val tags: ReviewTagRequest
+)
+
+data class ReviewTagRequest(
+    val efficacy: List<String>,
+    val side_Effect: List<String>,
+    val other: List<String>
+)
+
+data class ReviewCreateResponse(
+    val status: String,
+    val message: String?,
+    val data: Long
+)
+
+/**
+ * 리뷰 삭제
+ * */
+data class ReviewDeleteResponse(
+    val status: String,
+    val message: String?,
+    val data: String? = null
+)
+
+
+/**
  * 친구추가 링크 보내기
  */
 data class InviteUrlResponse(
@@ -586,3 +618,29 @@ data class FriendListDto(
 )
 
 
+data class ReviewResponse<T>(
+    val status: String,
+    val message: String?,
+    val data: T
+)
+
+/**
+ * 임신 여부 업데이트
+ */
+// PregnantUpdateRequest.kt
+data class PregnantUpdateRequest(
+    val pregnant: Boolean
+)
+
+// PregnantUpdateResponse.kt
+data class PregnantUpdateResponse(
+    val status: String,
+    val message: String?,
+    val data: PregnantUserData?
+)
+
+data class PregnantUserData(
+    val age: Int,
+    val gender: String,
+    val pregnant: Boolean
+)
