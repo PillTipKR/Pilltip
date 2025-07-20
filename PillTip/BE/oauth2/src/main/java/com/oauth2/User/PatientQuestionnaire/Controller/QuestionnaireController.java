@@ -188,12 +188,11 @@ public class QuestionnaireController {
 
         try {
             PatientQuestionnaire questionnaire = patientQuestionnaireService.getCurrentUserQuestionnaire(user);
-            Long expirationDate = System.currentTimeMillis() + 180 * 1000L;
             String phoneNumber = user.getUserProfile() != null ? user.getUserProfile().getPhone() : null;
             // 실시간 taking-pill 정보를 포함한 문진표 응답 생성
             PatientQuestionnaireResponse response = PatientQuestionnaireResponse.fromWithRealTimeMedication(
                 questionnaire, phoneNumber, user.getRealName(), user.getAddress(), 
-                encryptionUtil, takingPillService, expirationDate);
+                encryptionUtil, takingPillService);
             return ResponseEntity.status(200)
                 .body(ApiResponse.success(QuestionnaireMessageConstants.CURRENT_USER_QUESTIONNAIRE_RETRIEVE_SUCCESS, response));
         } catch (IllegalArgumentException e) {
@@ -339,11 +338,10 @@ public class QuestionnaireController {
 
         try {
             PatientQuestionnaire questionnaire = patientQuestionnaireService.updateCurrentUserQuestionnaire(user, request);
-            Long expirationDate = System.currentTimeMillis() + 180 * 1000L;
             // 실시간 taking-pill 정보를 포함한 문진표 응답 생성
             PatientQuestionnaireResponse response = PatientQuestionnaireResponse.fromWithRealTimeMedication(
                 questionnaire, request.getPhoneNumber(), request.getRealName(), request.getAddress(), 
-                encryptionUtil, takingPillService, expirationDate);
+                encryptionUtil, takingPillService);
             return ResponseEntity.status(200)
                 .body(ApiResponse.success(QuestionnaireMessageConstants.QUESTIONNAIRE_UPDATE_SUCCESS, response));
         } catch (IllegalArgumentException e) {
@@ -406,7 +404,7 @@ public class QuestionnaireController {
         
         try {
             PatientQuestionnaire questionnaire = patientQuestionnaireService.getQuestionnaireByIdPublic(id);
-            Long expirationDate = System.currentTimeMillis() + 180 * 1000L;
+            Long expirationDate = System.currentTimeMillis() + 60 * 60 * 1000L;
             // 실시간 taking-pill 정보를 포함한 공개 문진표 응답 생성
             PatientPublicQuestionnaireResponse response = PatientPublicQuestionnaireResponse.fromWithRealTimeMedication(
                 questionnaire, questionnaire.getUser().getUserProfile().getPhone(), 

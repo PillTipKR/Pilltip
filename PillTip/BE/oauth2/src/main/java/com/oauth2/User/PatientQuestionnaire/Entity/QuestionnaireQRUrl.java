@@ -7,6 +7,8 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "questionnaire_qr_url")
 @Getter
@@ -29,4 +31,7 @@ public class QuestionnaireQRUrl {
 
     @Column(name = "hospital_code", nullable = false)
     private String hospitalCode;
+
+    @Column(name = "create_date", nullable = false)
+    private LocalDateTime createDate = LocalDateTime.now();
 } 

@@ -39,7 +39,7 @@ public class PatientPublicQuestionnaireResponse {
     private List<Map<String, Object>> allergyInfo;
     private List<Map<String, Object>> chronicDiseaseInfo;
     private List<Map<String, Object>> surgeryHistoryInfo;
-    private Long expirationDate; // 3분 후 만료 시간(ms)
+    private Long expirationDate; // 1시간 후 만료 시간(ms)
 
     public static PatientPublicQuestionnaireResponse from(PatientQuestionnaire questionnaire, String decryptedPhoneNumber, String decryptedRealName, String decryptedAddress, EncryptionUtil encryptionUtil, Long expirationDate) {
         ObjectMapper objectMapper = new ObjectMapper();

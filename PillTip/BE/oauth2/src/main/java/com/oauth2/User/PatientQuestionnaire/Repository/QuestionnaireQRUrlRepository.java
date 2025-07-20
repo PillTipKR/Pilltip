@@ -22,7 +22,7 @@ public interface QuestionnaireQRUrlRepository extends JpaRepository<Questionnair
     // 사용자 ID로 QR URL 조회
     Optional<QuestionnaireQRUrl> findByUserId(Long userId);
     
-    @Query("SELECT q FROM QuestionnaireQRUrl q JOIN FETCH q.user WHERE q.hospitalCode = :hospitalCode")
+    @Query("SELECT q FROM QuestionnaireQRUrl q JOIN FETCH q.user u LEFT JOIN FETCH u.userProfile WHERE q.hospitalCode = :hospitalCode")
     List<QuestionnaireQRUrl> findByHospitalCodeWithUser(@Param("hospitalCode") String hospitalCode);
     // 사용자의 기존 QR URL 삭제
     @Modifying

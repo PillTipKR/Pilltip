@@ -41,7 +41,7 @@ public class PatientQuestionnaireResponse {
     private List<Map<String, Object>> surgeryHistoryInfo;
     // private Long expirationDate; // 3분 후 만료 시간(ms)
 
-    public static PatientQuestionnaireResponse from(PatientQuestionnaire questionnaire, String decryptedPhoneNumber, String decryptedRealName, String decryptedAddress, EncryptionUtil encryptionUtil, Long expirationDate) {
+    public static PatientQuestionnaireResponse from(PatientQuestionnaire questionnaire, String decryptedPhoneNumber, String decryptedRealName, String decryptedAddress, EncryptionUtil encryptionUtil) {
         ObjectMapper objectMapper = new ObjectMapper();
         try {
             return PatientQuestionnaireResponse.builder()
@@ -89,8 +89,50 @@ public class PatientQuestionnaireResponse {
         }
     }
 
-    // 실시간 taking-pill 정보를 포함한 문진표 응답 생성
-    public static PatientQuestionnaireResponse fromWithRealTimeMedication(PatientQuestionnaire questionnaire, String decryptedPhoneNumber, String decryptedRealName, String decryptedAddress, EncryptionUtil encryptionUtil, TakingPillService takingPillService, Long expirationDate) {
+    // 실시간 taking-pill 정보를 포함한 문진표 응답 생성 (일반 사용자용 - 만료시간 없음)
+    public static PatientQuestionnaireResponse fromWithRealTimeMedication(PatientQuestionnaire questionnaire, String decryptedPhoneNumber, String decryptedRealName, String decryptedAddress, EncryptionUtil encryptionUtil, TakingPillService takingPillService) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            // 실시간으로 taking-pill에서 약물 정보 가져오기
+            List<Map<String, Object>> realTimeMedicationInfo = takingPillService.getTakingPillsByUser(questionnaire.getUser()).stream()
+                    .map(takingPill -> {
+                        Map<String, Object> medication = new HashMap<>();
+                        medication.put("medicationId", takingPill.getMedicationId());
+                        medication.put("medicationName", takingPill.getMedicationName());
+                        medication.put("submitted", true);
+                        return medication;
+                    })
+                    .collect(Collectors.toList());
+
+            return PatientQuestionnaireResponse.builder()
+                    .realName(decryptedRealName)
+                    .address(decryptedAddress)
+                    .phoneNumber(decryptedPhoneNumber)
+                    .issueDate(questionnaire.getIssueDate())
+                    .lastModifiedDate(questionnaire.getLastModifiedDate())
+                    .medicationInfo(realTimeMedicationInfo) // 실시간 taking-pill 정보 사용
+                    .allergyInfo(parseEncryptedJsonToList(questionnaire.getAllergyInfo(), objectMapper, encryptionUtil))
+                    .chronicDiseaseInfo(parseEncryptedJsonToList(questionnaire.getChronicDiseaseInfo(), objectMapper, encryptionUtil))
+                    .surgeryHistoryInfo(parseEncryptedJsonToList(questionnaire.getSurgeryHistoryInfo(), objectMapper, encryptionUtil))
+                    .build();
+        } catch (Exception e) {
+            // 파싱 실패 시에도 빈 리스트로 기본값 설정
+            return PatientQuestionnaireResponse.builder()
+                    .realName(decryptedRealName)
+                    .address(decryptedAddress)
+                    .phoneNumber(decryptedPhoneNumber)
+                    .issueDate(questionnaire.getIssueDate())
+                    .lastModifiedDate(questionnaire.getLastModifiedDate())
+                    .medicationInfo(List.of())
+                    .allergyInfo(List.of())
+                    .chronicDiseaseInfo(List.of())
+                    .surgeryHistoryInfo(List.of())
+                    .build();
+        }
+    }
+
+    // 실시간 taking-pill 정보를 포함한 문진표 응답 생성 (Public용 - 만료시간 포함)
+    public static PatientQuestionnaireResponse fromWithRealTimeMedicationAndExpiration(PatientQuestionnaire questionnaire, String decryptedPhoneNumber, String decryptedRealName, String decryptedAddress, EncryptionUtil encryptionUtil, TakingPillService takingPillService, Long expirationDate) {
         ObjectMapper objectMapper = new ObjectMapper();
         try {
             // 실시간으로 taking-pill에서 약물 정보 가져오기

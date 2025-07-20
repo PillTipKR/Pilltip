@@ -229,17 +229,29 @@ public class TokenService {
                 .compact();
     }
 
-    // 커스텀 JWT 토큰 검증 (questionnaireId 일치)
+    // 만료시간이 없는 커스텀 JWT 토큰 생성
+    public String createCustomJwtTokenWithoutExpiration(Long userId, String hospitalCode) {
+        long now = System.currentTimeMillis();
+        Key key = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), SignatureAlgorithm.HS256.getJcaName());
+
+        return Jwts.builder()
+                .setSubject(String.valueOf(userId))
+                .claim("hospitalCode", hospitalCode)
+                .setIssuedAt(new Date(now))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // 커스텀 JWT 토큰 검증 (userId 일치)
     public boolean validateCustomJwtToken(String token, String id) {
         try {
-            
             Claims claims = Jwts.parserBuilder()
                 .setSigningKey(secretKey.getBytes())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
-            String tokenId = claims.get("id", String.class);
-            return id.equals(tokenId);
+            String tokenUserId = claims.getSubject();
+            return id.equals(tokenUserId);
         } catch (Exception e) {
             return false;
         }
