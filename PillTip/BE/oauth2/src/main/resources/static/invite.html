@@ -1,0 +1,23 @@
+<!-- /invite.html -->
+<!DOCTYPE html>
+<html lang="kr">
+<head>
+    <meta charset="UTF-8">
+    <title>앱 실행 중...</title>
+    <script>
+        const token = new URLSearchParams(window.location.search).get("token");
+        if (token) {
+            // 앱 실행 시도
+            window.location.href = `pilltip://invite/${token}`;
+        }
+
+        // 앱이 설치 안되어 있으면 fallback 처리 (마켓 또는 랜딩페이지)
+        setTimeout(() => {
+            window.location.href = "https://pilltip.com/download";
+        }, 2000);
+    </script>
+</head>
+<body>
+앱을 실행 중입니다... 설치되지 않았다면 자동으로 다운로드 페이지로 이동합니다.
+</body>
+</html>

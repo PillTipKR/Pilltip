@@ -42,12 +42,12 @@ public class FriendController {
         Long userId = user.getId();
         String token = friendService.generateInviteToken(userId);
 
-        String inviteUrl = server + "/friend/invite/" + token;
+        String inviteUrl = server + "/api/friend/inviting/" + token;
 
         return ResponseEntity.ok(Map.of("inviteUrl", inviteUrl));
     }
 
-    @GetMapping("/invite/{token}")
+    @GetMapping("/inviting/{token}")
     public RedirectView redirectToHtml(@PathVariable String token) {
         String url = server + "/invite.html?token=" + token;
         return new RedirectView(url);
