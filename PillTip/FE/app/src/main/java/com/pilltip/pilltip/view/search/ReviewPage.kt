@@ -1,20 +1,27 @@
 package com.pilltip.pilltip.view.search
 
-import android.util.Log
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -22,6 +29,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,27 +42,38 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.pilltip.pilltip.composable.BackButton
 import com.pilltip.pilltip.composable.HeightSpacer
+import com.pilltip.pilltip.composable.NextButton
 import com.pilltip.pilltip.composable.SearchComposable.DashedBorderBox
 import com.pilltip.pilltip.composable.SearchComposable.EfficiencyRow
+import com.pilltip.pilltip.composable.SearchComposable.RatingBar
 import com.pilltip.pilltip.composable.SearchComposable.ReviewItemCard
+import com.pilltip.pilltip.composable.SearchComposable.ReviewPhotoPicker
 import com.pilltip.pilltip.composable.SearchComposable.ReviewRatingBar
+import com.pilltip.pilltip.composable.SearchComposable.ReviewTextField
 import com.pilltip.pilltip.composable.SearchComposable.StarRatingBar
+import com.pilltip.pilltip.composable.SearchComposable.TagSection
+import com.pilltip.pilltip.composable.WhiteScreenModifier
 import com.pilltip.pilltip.composable.WidthSpacer
+import com.pilltip.pilltip.composable.buttonModifier
 import com.pilltip.pilltip.model.UserInfoManager
 import com.pilltip.pilltip.model.search.DetailDrugData
-import com.pilltip.pilltip.model.search.ReviewListData
 import com.pilltip.pilltip.model.search.ReviewStatsData
+import com.pilltip.pilltip.model.search.ReviewTagRequest
 import com.pilltip.pilltip.model.search.ReviewViewModel
 import com.pilltip.pilltip.model.search.SearchHiltViewModel
 import com.pilltip.pilltip.ui.theme.gray050
 import com.pilltip.pilltip.ui.theme.gray100
 import com.pilltip.pilltip.ui.theme.gray200
+import com.pilltip.pilltip.ui.theme.gray400
 import com.pilltip.pilltip.ui.theme.gray500
+import com.pilltip.pilltip.ui.theme.gray600
 import com.pilltip.pilltip.ui.theme.gray800
 import com.pilltip.pilltip.ui.theme.pretendard
 import com.pilltip.pilltip.ui.theme.primaryColor
@@ -64,7 +86,6 @@ fun ReviewTab(
     reviewViewModel: ReviewViewModel
 ) {
     val reviewStats by searchHiltViewModel.reviewStats.collectAsState()
-
     LaunchedEffect(Unit) {
         searchHiltViewModel.fetchReviewStats(detail.id)
     }
@@ -73,7 +94,7 @@ fun ReviewTab(
     ) {
         reviewStats?.let { ReviewStatisticsSection(navController, it) }
         HorizontalDivider(thickness = 10.dp, color = gray100)
-        reviewStats?.let { ReviewSection(navController, reviewStats, reviewViewModel, detail.id) }
+        reviewStats?.let { ReviewSection(reviewStats, reviewViewModel, detail.id) }
         HeightSpacer(100.dp)
 
     }
@@ -106,7 +127,7 @@ fun ReviewStatisticsSection(
             )
             WidthSpacer(4.dp)
             Text(
-                text = reviewStats?.total?.toString() ?: "-",
+                text = reviewStats.total.toString(),
                 style = TextStyle(
                     fontSize = 18.sp,
                     fontFamily = pretendard,
@@ -118,7 +139,7 @@ fun ReviewStatisticsSection(
         HeightSpacer(8.dp)
         Text(
             text = buildAnnotatedString {
-                val likeCount = reviewStats?.like?.toString() ?: "0"
+                val likeCount = reviewStats.like.toString()
                 withStyle(style = SpanStyle(color = primaryColor)) {
                     append(likeCount)
                 }
@@ -189,33 +210,28 @@ fun ReviewStatisticsSection(
             ) {
                 ReviewRatingBar(
                     title = "5점",
-                    total = reviewStats?.total ?: 0,
-                    progress = reviewStats?.ratingStatsResponse?.ratingCounts?.get("5")
-                        ?.div(100f) ?: 0f,
+                    total = reviewStats.total,
+                    progress = reviewStats.ratingStatsResponse.ratingCounts["5"]?:0,
                 )
                 ReviewRatingBar(
                     title = "4점",
-                    total = reviewStats?.total ?: 0,
-                    progress = reviewStats?.ratingStatsResponse?.ratingCounts?.get("4")
-                        ?.div(100f) ?: 0f,
+                    total = reviewStats.total,
+                    progress = reviewStats.ratingStatsResponse.ratingCounts["4"] ?:0,
                 )
                 ReviewRatingBar(
                     title = "3점",
-                    total = reviewStats?.total ?: 0,
-                    progress = reviewStats?.ratingStatsResponse?.ratingCounts?.get("3")
-                        ?.div(100f) ?: 0f,
+                    total = reviewStats.total,
+                    progress = reviewStats.ratingStatsResponse.ratingCounts["3"] ?:0,
                 )
                 ReviewRatingBar(
                     title = "2점",
-                    total = reviewStats?.total ?: 0,
-                    progress = reviewStats?.ratingStatsResponse?.ratingCounts?.get("2")
-                        ?.div(100f) ?: 0f,
+                    total = reviewStats.total,
+                    progress = reviewStats.ratingStatsResponse.ratingCounts["2"] ?:0,
                 )
                 ReviewRatingBar(
                     title = "1점",
-                    total = reviewStats?.total ?: 0,
-                    progress = reviewStats?.ratingStatsResponse?.ratingCounts?.get("1")
-                        ?.div(100f) ?: 0f,
+                    total = reviewStats.total,
+                    progress = reviewStats.ratingStatsResponse.ratingCounts["1"] ?:0,
                 )
             }
         }
@@ -229,23 +245,23 @@ fun ReviewStatisticsSection(
         ) {
             EfficiencyRow(
                 title = "효과",
-                description = reviewStats?.tagStatsByType?.get("EFFICACY")?.mostUsedTagName
+                description = reviewStats.tagStatsByType["EFFICACY"]?.mostUsedTagName
                     ?: "집계 중",
-                percentage = reviewStats?.tagStatsByType?.get("EFFICACY")?.mostUsedTagCount ?: 0,
-                num = reviewStats?.tagStatsByType?.get("EFFICACY")?.totalTagCount ?: 0
+                percentage = reviewStats.tagStatsByType["EFFICACY"]?.mostUsedTagCount ?: 0,
+                num = reviewStats.tagStatsByType["EFFICACY"]?.totalTagCount ?: 0
             )
             EfficiencyRow(
                 title = "부작용",
-                description = reviewStats?.tagStatsByType?.get("SIDE_EFFECT")?.mostUsedTagName
+                description = reviewStats.tagStatsByType["SIDE_EFFECT"]?.mostUsedTagName
                     ?: "집계 중",
-                percentage = reviewStats?.tagStatsByType?.get("SIDE_EFFECT")?.mostUsedTagCount ?: 0,
-                num = reviewStats?.tagStatsByType?.get("SIDE_EFFECT")?.totalTagCount ?: 0
+                percentage = reviewStats.tagStatsByType["SIDE_EFFECT"]?.mostUsedTagCount ?: 0,
+                num = reviewStats.tagStatsByType["SIDE_EFFECT"]?.totalTagCount ?: 0
             )
             EfficiencyRow(
                 title = "기타",
-                description = reviewStats?.tagStatsByType?.get("OTHER")?.mostUsedTagName ?: "집계 중",
-                percentage = reviewStats?.tagStatsByType?.get("OTHER")?.mostUsedTagCount ?: 0,
-                num = reviewStats?.tagStatsByType?.get("OTHER")?.totalTagCount ?: 0
+                description = reviewStats.tagStatsByType["OTHER"]?.mostUsedTagName ?: "집계 중",
+                percentage = reviewStats.tagStatsByType["OTHER"]?.mostUsedTagCount ?: 0,
+                num = reviewStats.tagStatsByType["OTHER"]?.totalTagCount ?: 0
             )
         }
         HeightSpacer(12.dp)
@@ -262,7 +278,7 @@ fun ReviewStatisticsSection(
         HeightSpacer(4.dp)
         DashedBorderBox(
             onRegisterClick = {
-                navController.navigate("QuestionnairePage")
+                navController.navigate("EssentialPage")
             }
         )
     }
@@ -270,13 +286,12 @@ fun ReviewStatisticsSection(
 
 @Composable
 fun ReviewSection(
-    navController: NavController,
     reviewStats: ReviewStatsData?,
     reviewViewModel: ReviewViewModel,
     id: Long
 ) {
-    Log.d("진입", "여기")
     val reviewListData by reviewViewModel.reviewListData.collectAsState()
+
     LaunchedEffect(Unit) {
         reviewViewModel.loadReviews(id)
     }
@@ -320,7 +335,7 @@ fun ReviewSection(
 
         reviewListData?.content?.let { reviews ->
             items(reviews) { review ->
-                ReviewItemCard(review)
+                ReviewItemCard(review, reviewViewModel)
                 HorizontalDivider(thickness = 4.dp, color = gray100)
             }
         }
@@ -329,8 +344,147 @@ fun ReviewSection(
 
 @Composable
 fun ReviewWritePage(
-
+    navController: NavController,
+    reviewViewModel: ReviewViewModel,
+    id: Long
 ) {
+    val efficacyTags = listOf("효과 빠름", "통증 완화", "수면 도움", "염증 완화")
+    val sideEffectTags = listOf("졸림", "메스꺼움", "두통", "피로감")
+    val otherTags = listOf("복용 편함", "맛이 괜찮음", "포장 간편함", "가격 저렴함")
+    var context = LocalContext.current
 
+    val selectedEfficacy = remember { mutableStateListOf<String>() }
+    val selectedSideEffect = remember { mutableStateListOf<String>() }
+    val selectedOther = remember { mutableStateListOf<String>() }
+    val reviewImages = remember { mutableStateListOf<Uri>() }
+    var reviewText by remember { mutableStateOf("") }
+
+    var rating by remember { mutableStateOf(0f) }
+    var nickname = UserInfoManager.getUserData(context)?.nickname
+    BackHandler {
+        navController.popBackStack()
+    }
+    Column(
+        modifier = WhiteScreenModifier
+            .statusBarsPadding()
+            .padding(horizontal = 22.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        BackButton(
+            title = "리뷰 작성하기",
+            horizontalPadding = 0.dp,
+            verticalPadding = 0.dp
+        ) {
+            navController.popBackStack()
+        }
+        HeightSpacer(30.dp)
+        Text(
+            text = "${nickname}님, 복약 만족도는 어떠셨나요?",
+            style = TextStyle(
+                fontSize = 16.sp,
+                fontFamily = pretendard,
+                fontWeight = FontWeight(700),
+                color = Color(0xFF000000),
+                textAlign = TextAlign.Center,
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+        HeightSpacer(8.dp)
+        Text(
+            text = "솔직한 답변이 많은 분들께 큰 도움이 돼요!",
+            style = TextStyle(
+                fontSize = 14.sp,
+                fontFamily = pretendard,
+                fontWeight = FontWeight(400),
+                color = gray600,
+                textAlign = TextAlign.Center,
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+        HeightSpacer(19.dp)
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            RatingBar(rating = rating) { rating = it }
+        }
+        HeightSpacer(30.dp)
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 18.dp),
+            thickness = 1.dp,
+            color = gray100
+        )
+        HeightSpacer(12.dp)
+        TagSection("효능", efficacyTags, selectedEfficacy)
+        HeightSpacer(16.dp)
+        TagSection("부작용", sideEffectTags, selectedSideEffect)
+        HeightSpacer(16.dp)
+        TagSection("기타", otherTags, selectedOther)
+        HeightSpacer(24.dp)
+
+        ReviewPhotoPicker(
+            onImagesChanged = { newUris ->
+                reviewImages.clear()
+                reviewImages.addAll(newUris)
+            }
+        )
+        HeightSpacer(26.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "내용을 입력해주세요 (선택)",
+                style = TextStyle(
+                    fontSize = 16.sp,
+                    fontFamily = pretendard,
+                    fontWeight = FontWeight(600),
+                    color = gray800,
+                )
+            )
+            Text(
+                text = "${reviewText.length} / 200",
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    fontFamily = pretendard,
+                    fontWeight = FontWeight(400),
+                    color = gray400,
+                )
+            )
+        }
+        HeightSpacer(16.dp)
+        ReviewTextField(
+            nickname = nickname.toString(),
+            text = reviewText,
+            onTextChange = { if (it.length <= 200) reviewText = it }
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+        NextButton(
+            mModifier = buttonModifier,
+            text = "등록하기"
+        ) {
+            reviewViewModel.createReview(
+                drugId = id,
+                rating = rating,
+                content = reviewText,
+                tags = ReviewTagRequest(
+                    efficacy = selectedEfficacy.toList(),
+                    side_Effect = selectedSideEffect.toList(),
+                    other = selectedOther.toList()
+                ),
+                context = context,
+                imageUris = reviewImages.toList(),
+                onSuccess = {
+                    navController.popBackStack()
+                    Toast.makeText(context, "리뷰 등록 완료!", Toast.LENGTH_SHORT).show()
+                },
+                onError = { errorMsg ->
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
 }
 

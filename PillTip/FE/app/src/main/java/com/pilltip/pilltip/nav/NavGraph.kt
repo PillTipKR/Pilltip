@@ -53,6 +53,7 @@ import com.pilltip.pilltip.view.search.AudioSearchPage
 import com.pilltip.pilltip.view.search.DetailPage
 import com.pilltip.pilltip.view.search.DosageAlarmPage
 import com.pilltip.pilltip.view.search.DosagePage
+import com.pilltip.pilltip.view.search.ReviewWritePage
 import com.pilltip.pilltip.view.search.SearchPage
 import com.pilltip.pilltip.view.search.SearchResultsPage
 
@@ -175,6 +176,16 @@ fun NavGraph(
                 navController = navController,
                 searchViewModel = searchHiltViewModel,
                 isEditMode = mode
+            )
+        }
+
+        /* 리뷰 작성 */
+        composable("ReviewWritePage/{drugId}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("drugId")?.toLong() ?: 0L
+            ReviewWritePage(
+                navController,
+                reviewViewModel,
+                id
             )
         }
 
@@ -339,7 +350,7 @@ fun NavGraph(
                 sensitiveViewModel = sensitiveViewModel
             )
         }
-        composable ("FriendListPage"){
+        composable("FriendListPage") {
             FriendListPage(navController, searchHiltViewModel)
         }
 

@@ -237,9 +237,9 @@ fun TermBottomSheet(
                     .padding(vertical = 16.dp)
                     .height(58.dp),
                 text = "확인",
-                buttonColor = if (isEssentialChecked) Color(0xFF348ADF) else Color(0xFFCADCF5),
+                buttonColor = if (isEssentialChecked && isAgeChecked) Color(0xFF348ADF) else Color(0xFFCADCF5),
                 onClick = {
-                    if(isEssentialChecked){
+                    if(isEssentialChecked && isAgeChecked){
                         vm.updateTermsOfServices(true)
                         onDismiss()
                         navController.navigate("PhoneAuthPage")

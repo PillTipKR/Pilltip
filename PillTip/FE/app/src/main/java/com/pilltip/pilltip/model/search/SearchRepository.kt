@@ -1,10 +1,14 @@
 package com.pilltip.pilltip.model.search
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Url
@@ -539,6 +543,24 @@ interface ReviewApi {
         @Query("sortKey") sortKey: String,
         @Query("direction") direction: String
     ): ReviewListResponse
+
+    @Multipart
+    @POST("/api/review/create")
+    suspend fun createReview(
+        @Part("review") review: RequestBody,
+        @Part images: List<MultipartBody.Part>
+    ): ReviewCreateResponse
+
+
+    @DELETE("/api/review/delete/{reviewId}")
+    suspend fun deleteReview(
+        @Path("reviewId") reviewId: Long
+    ): ReviewDeleteResponse
+
+    @POST("/api/review/{reviewId}/like")
+    suspend fun likeReview(
+        @Path("reviewId") reviewId: Long
+    ): ReviewResponse<String>
 }
 
 interface ReviewRepository {
@@ -549,6 +571,15 @@ interface ReviewRepository {
         sortKey: String,
         direction: String
     ): ReviewListData
+
+    suspend fun createReviewMultipart(
+        review: RequestBody,
+        images: List<MultipartBody.Part>
+    ): Long
+
+    suspend fun deleteReview(reviewId: Long): String
+    suspend fun likeReview(reviewId: Long): String
+
 }
 
 class ReviewRepositoryImpl(
@@ -563,6 +594,21 @@ class ReviewRepositoryImpl(
         direction: String
     ): ReviewListData {
         return api.getDrugReviews(drugId, page, size, sortKey, direction).data
+    }
+
+    override suspend fun createReviewMultipart(
+        review: RequestBody,
+        images: List<MultipartBody.Part>
+    ): Long {
+        return api.createReview(review, images).data
+    }
+
+    override suspend fun deleteReview(reviewId: Long): String {
+        return api.deleteReview(reviewId).message ?: "삭제 완료"
+    }
+
+    override suspend fun likeReview(reviewId: Long): String {
+        return api.likeReview(reviewId).data
     }
 }
 

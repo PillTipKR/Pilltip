@@ -1481,7 +1481,14 @@ fun InterestPage(
     viewModel: SignUpViewModel
 ) {
     val selectedKeywords = remember { mutableStateListOf<String>() }
-    val allKeywords = List(20) { index -> "키워드~${index + 1}" }
+    val allKeywords = listOf(
+        "복약", "운동", "수면", "스트레스", "면역력",
+        "복약관리", "만성질환", "피부질환", "소화",
+        "체중감량", "알러지", "금연", "문진표",
+        "정신건강", "백신", "약물부작용", "가족건강",
+        "개인정보", "보안"
+    )
+
     val context = LocalContext.current
 
     Column(
