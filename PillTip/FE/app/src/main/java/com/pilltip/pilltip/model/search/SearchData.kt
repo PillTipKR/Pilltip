@@ -644,3 +644,40 @@ data class PregnantUserData(
     val gender: String,
     val pregnant: Boolean
 )
+
+/**
+ * 자녀 프로필
+ */
+
+data class CreateProfileRequest(
+    val nickname: String,
+    val gender: String,
+    val birthDate: String,
+    val age: Int,
+    val height: Int,
+    val weight: Int
+)
+
+// CreateProfileResponse.kt
+data class CreateProfileResponse(
+    val status: String,
+    val message: String?,
+    val data: ProfileData?
+)
+
+data class ProfileData(
+    val id: Long,
+    val nickname: String,
+    val profilePhoto: String?,
+    val terms: Boolean,
+    val age: Int,
+    val gender: String,
+    val birthDate: String,
+    val pregnant: Boolean,
+    val height: String,
+    val weight: String,
+    val realName: String?,
+    val address: String?,
+    val permissions: Boolean
+)
+

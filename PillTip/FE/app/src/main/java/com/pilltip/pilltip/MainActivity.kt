@@ -28,6 +28,7 @@ import com.pilltip.pilltip.model.search.LogViewModel
 import com.pilltip.pilltip.model.search.ReviewViewModel
 import com.pilltip.pilltip.model.search.SearchHiltViewModel
 import com.pilltip.pilltip.model.search.SensitiveViewModel
+import com.pilltip.pilltip.model.search.UserProfileViewModel
 import com.pilltip.pilltip.model.signUp.ServerAuthAPI
 import com.pilltip.pilltip.model.signUp.SignUpViewModel
 import com.pilltip.pilltip.model.signUp.TokenManager
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
             val logViewModel: LogViewModel = viewModel()
             val sensitiveViewModel : SensitiveViewModel = hiltViewModel()
             val reviewViewModel : ReviewViewModel = hiltViewModel()
+            val userProfileViewModel : UserProfileViewModel = hiltViewModel()
             val context = LocalContext.current
             Log.d("KeyHash", Utility.getKeyHash(this))
 
@@ -95,7 +97,8 @@ class MainActivity : ComponentActivity() {
                 searchHiltViewModel = searchHiltViewModel,
                 logViewModel = logViewModel,
                 sensitiveViewModel = sensitiveViewModel,
-                reviewViewModel = reviewViewModel
+                reviewViewModel = reviewViewModel,
+                userProfileViewModel = userProfileViewModel
             )
         }
     }

@@ -336,9 +336,10 @@ fun HomePage(
         )
         FeatureButton(
             imageResource = R.drawable.ic_main_cute_baby,
-            description = "자녀 관리",
+            description = "가족 관리",
             onClick = {
-                Toast.makeText(context, "법적 검토 중인 기능이에요\n업데이트를 기대해주세요!", Toast.LENGTH_SHORT).show()
+                navController.navigate("ChildrenPage")
+//                Toast.makeText(context, "법적 검토 중인 기능이에요\n업데이트를 기대해주세요!", Toast.LENGTH_SHORT).show()
             }
         )
         FeatureButton(

@@ -90,14 +90,17 @@ data class UserData(
     val realName: String?,
     val address: String?,
     val permissions: Boolean,
-    val userList: List<UserProfile>?,
-    val main: Boolean
+    val userList: List<UserProfile>?
 )
 
 data class UserProfile(
     val userId: Long,
     val nickname: String,
-    val isMain: Boolean
+    val age : Int,
+    val birthDate : String,
+    val gender : String,
+    val isMain: Boolean,
+    val isSelected: Boolean
 )
 
 /* 중복 체크 */

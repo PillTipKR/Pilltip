@@ -1,30 +1,24 @@
 package com.pilltip.pilltip.model.signUp
 
-import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.GsonBuilder
-import com.pilltip.pilltip.R
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
+import org.json.JSONObject
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
-import java.security.KeyStore
-import java.security.cert.CertificateFactory
+import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManagerFactory
-import javax.net.ssl.X509TrustManager
 
 interface ServerAuthAPI {
     @POST("api/auth/signup")
@@ -47,14 +41,45 @@ interface ServerAuthAPI {
 
     @GET("api/auth/me")
     suspend fun getMyInfo(
-        @Header("Authorization") token: String
+        @Header("Authorization") token: String,
+        @Header("X-Profile-Id") profileId: Long? = null
     ): Response<AuthMeResponse>
+
 
     @POST("api/auth/check-duplicate")
     suspend fun checkDuplicate(
         @Body request: DuplicateCheckRequest
     ): Response<DuplicateCheckResponse>
 }
+
+interface ProfileApi {
+    @DELETE("/api/user-profile")
+    suspend fun deleteProfile(
+        @Header("Authorization") token: String,
+        @Header("X-Profile-Id") profileId: Long
+    ): Response<Unit>
+}
+
+interface ProfileRepository {
+    suspend fun deleteProfile(token: String, profileId: Long)
+}
+
+class ProfileRepositoryImpl @Inject constructor(
+    private val api: ProfileApi
+) : ProfileRepository {
+
+    override suspend fun deleteProfile(token: String, profileId: Long) {
+        val bearerToken = "Bearer $token"
+        val response = api.deleteProfile(bearerToken, profileId)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()
+            val message = JSONObject(errorBody ?: "{}")
+                .optString("message", "프로필 삭제에 실패했어요.")
+            throw Exception(message)
+        }
+    }
+}
+
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -75,6 +100,16 @@ object NetworkModule {
     @Provides
     fun provideServerAuthAPI(@Named("AuthRetrofit") retrofit: Retrofit): ServerAuthAPI {
         return retrofit.create(ServerAuthAPI::class.java)
+    }
+
+    @Provides
+    fun provideProfileApi(@Named("AuthRetrofit") retrofit: Retrofit): ProfileApi {
+        return retrofit.create(ProfileApi::class.java)
+    }
+
+    @Provides
+    fun provideProfileRepository(api: ProfileApi): ProfileRepository {
+        return ProfileRepositoryImpl(api)
     }
 }
 

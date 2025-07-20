@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.pilltip.pilltip.model.AuthInterceptor
+import com.pilltip.pilltip.model.ProfileIdInterceptor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -932,8 +933,39 @@ class ReviewViewModel @Inject constructor(
             }
         }
     }
-
 }
+
+@HiltViewModel
+class UserProfileViewModel @Inject constructor(
+    private val repository: UserProfileRepository
+) : ViewModel() {
+
+    private val _createProfileResult = MutableStateFlow<Result<ProfileData>?>(null)
+    val createProfileResult: StateFlow<Result<ProfileData>?> = _createProfileResult
+
+
+    fun createProfile(
+        request: CreateProfileRequest,
+        onSuccess: () -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = repository.createProfile(request)
+                if (response.status == "success" && response.data != null) {
+                    _createProfileResult.value = Result.success(response.data)
+                    onSuccess()
+                } else {
+                    onError(Exception(response.message ?: "프로필 생성 실패"))
+                }
+            } catch (e: Exception) {
+                _createProfileResult.value = Result.failure(e)
+                onError(e)
+            }
+        }
+    }
+}
+
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -945,6 +977,7 @@ object RepositoryModule {
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(context))
+            .addInterceptor(ProfileIdInterceptor(context))
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             })
@@ -1172,7 +1205,7 @@ object RepositoryModule {
         return FriendRepositoryImpl(api)
     }
 
-    /* 임신 여부 */
+    /* 자녀 계정 및 임신 여부 */
     @Provides
     fun provideUserProfileApi(@Named("SearchRetrofit") retrofit: Retrofit): UserProfileApi {
         return retrofit.create(UserProfileApi::class.java)

@@ -9,7 +9,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.core.graphics.toColorInt
 import androidx.navigation.NavController
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.pilltip.pilltip.R
@@ -73,7 +73,6 @@ import com.pilltip.pilltip.composable.noRippleClickable
 import com.pilltip.pilltip.model.UserInfoManager
 import com.pilltip.pilltip.model.search.AllergyInfo
 import com.pilltip.pilltip.model.search.ChronicDiseaseInfo
-import com.pilltip.pilltip.model.search.SearchHiltViewModel
 import com.pilltip.pilltip.model.search.SensitiveViewModel
 import com.pilltip.pilltip.model.search.SurgeryHistoryInfo
 import com.pilltip.pilltip.model.signUp.SignUpViewModel
@@ -91,7 +90,6 @@ import com.pilltip.pilltip.view.auth.logic.EssentialTerms
 import com.pilltip.pilltip.view.auth.logic.OptionalTerms
 import com.pilltip.pilltip.view.questionnaire.Logic.toKoreanGender
 import kotlinx.coroutines.launch
-import androidx.core.graphics.toColorInt
 
 @Composable
 fun QuestionnairePage(
@@ -955,8 +953,9 @@ fun SensitiveFinalPage(
                 )
             }
             Column(
-                modifier = Modifier.weight(1f)
-                .verticalScroll(rememberScrollState())
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
             ) {
                 HeightSpacer(10.dp)
                 Column(
@@ -1068,9 +1067,19 @@ fun SensitiveFinalPage(
                 sensitiveViewModel.phoneNumber = phoneNumber.toString()
                 sensitiveViewModel.submitSensitiveProfile(
                     onSuccess = {
-                        viewModel.fetchMyInfo(TokenManager.getAccessToken(context).toString()) { userData ->
+                        viewModel.fetchMyInfo(
+                            TokenManager.getAccessToken(context).toString(),
+                            UserInfoManager
+                                .getUserData(context)
+                                ?.userList
+                                ?.find { it.isSelected }
+                                ?.userId) { userData ->
                             UserInfoManager.saveUserData(context, userData)
-                            Toast.makeText(context, "민감정보 작성 완료!\n 필팁의 강력한 AI 기능을 이용해보세요!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "민감정보 작성 완료!\n 필팁의 강력한 AI 기능을 이용해보세요!",
+                                Toast.LENGTH_SHORT
+                            ).show()
                             if (backStackEntryExists) {
                                 navController.navigate("DetailPage") {
                                     popUpTo("DetailPage") {
