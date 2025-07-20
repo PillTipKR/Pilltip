@@ -1,5 +1,3 @@
-// author : mireutale
-// description : JWT 인증 필터
 package com.oauth2.Account.Security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,8 +40,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         // JWT 토큰 검증이 필요 없는 경로들
         String requestURI = request.getRequestURI();
-
-        
         if (requestURI.equals("/api/auth/signup") || 
             requestURI.equals("/api/auth/login") || 
             requestURI.equals("/api/auth/social-login") ||
@@ -52,7 +48,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             requestURI.startsWith("/oauth2/") ||
             requestURI.startsWith("/api/questionnaire/public/") ||
             requestURI.startsWith("/api/friend/inviting") ||
-            requestURI.startsWith("/invite.html")) {
+            requestURI.startsWith("/invite.html") ||
+            requestURI.startsWith("/api/questionnaire/qr-url/all")) {
             filterChain.doFilter(request, response);
             return;
         }

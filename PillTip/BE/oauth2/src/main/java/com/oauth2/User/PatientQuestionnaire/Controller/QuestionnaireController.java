@@ -19,6 +19,7 @@ import com.oauth2.User.PatientQuestionnaire.Dto.QuestionnaireAvailabilityRespons
 import com.oauth2.User.PatientQuestionnaire.Dto.PatientPublicQuestionnaireResponse;
 import com.oauth2.User.PatientQuestionnaire.Dto.QuestionnaireQRUrlResponse;
 import com.oauth2.User.PatientQuestionnaire.Dto.PatientQuestionnaireRequest;
+import com.oauth2.User.Hospital.HospitalService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,7 @@ public class QuestionnaireController {
     private final QuestionnaireQRUrlService questionnaireQRUrlService;
     private final EncryptionUtil encryptionUtil;
     private final AccountService accountService;
+    private final HospitalService hospitalService;
 
     //동의사항 조회
     @GetMapping("/permissions")
@@ -421,10 +423,19 @@ public class QuestionnaireController {
         }
     }
 
-    @GetMapping("/qr-url/all/{hospitalCode}")
+    @GetMapping("/qr-url/all")
     public ResponseEntity<ApiResponse<List<QuestionnaireQRUrlResponse>>> getAllQRUrl(
-            @PathVariable(value = "hospitalCode", required = false) String hospitalCode) {
+            @RequestParam String accessToken) {
         try {
+            // 접근 토큰 유효성 검증
+            if (!hospitalService.validateAccessToken(accessToken)) {
+                return ResponseEntity.status(401)
+                    .body(ApiResponse.error("유효하지 않은 접근 토큰입니다.", null));
+            }
+            
+            // 토큰으로 병원 코드 조회
+            String hospitalCode = hospitalService.getHospitalCodeByToken(accessToken);
+            
             List<QuestionnaireQRUrlResponse> response = questionnaireQRUrlService.getAllQRUrl(hospitalCode);
             return ResponseEntity.ok(ApiResponse.success(QuestionnaireMessageConstants.QR_URL_RETRIEVE_SUCCESS, response));
         } catch (IllegalArgumentException e) {

@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class HospitalService {
     private final HospitalRepository hospitalRepository;
+    private final HospitalAccessTokenService tokenService;
 
     public boolean existsByHospitalCode(String hospitalCode) {
         return hospitalRepository.findByHospitalCode(hospitalCode).isPresent();
@@ -63,5 +64,28 @@ public class HospitalService {
             .filter(h -> h.getHospitalCode() != null && h.getHospitalCode().startsWith(prefix))
             .count();
         return prefix + (count + 1);
+    }
+    
+    /**
+     * 병원 코드로 현재 일일 접근 토큰 조회
+     */
+    public String getCurrentAccessToken(String hospitalCode) {
+        return tokenService.getCurrentTokenByHospitalCode(hospitalCode)
+            .orElseThrow(() -> new IllegalArgumentException("해당 병원의 접근 토큰을 찾을 수 없습니다."));
+    }
+    
+    /**
+     * 접근 토큰 유효성 검증
+     */
+    public boolean validateAccessToken(String accessToken) {
+        return tokenService.validateToken(accessToken);
+    }
+    
+    /**
+     * 접근 토큰으로 병원 코드 조회
+     */
+    public String getHospitalCodeByToken(String accessToken) {
+        return tokenService.getHospitalCodeByToken(accessToken)
+            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 접근 토큰입니다."));
     }
 } 
