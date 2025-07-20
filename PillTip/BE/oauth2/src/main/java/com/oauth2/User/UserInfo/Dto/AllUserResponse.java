@@ -35,7 +35,6 @@ public class AllUserResponse{
     private final boolean permissions;
     private final Boolean friendPermission;
 
-    private final boolean isMain;
     private final List<UserListDto> userList;
 
     // 생성자, 앱에서 정보를 처리하기 쉽도록 일정한 형식으로 변환
@@ -44,7 +43,6 @@ public class AllUserResponse{
         this.nickname = user.getNickname();
         this.profilePhoto = user.getProfilePhoto(); // EncryptionConverter가 자동으로 복호화
         this.terms = user.getTerms();
-        this.isMain = user.isMain();
         this.userList = userList;
 
         // UserProfile에서 정보 가져오기

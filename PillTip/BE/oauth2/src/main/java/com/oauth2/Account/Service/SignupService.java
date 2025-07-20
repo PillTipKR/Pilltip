@@ -42,7 +42,8 @@ public class SignupService {
     private final UserProfileService userProfileService;
 
     //회원가입 요청 처리
-    public User signup(SignupRequest request) {
+    @Transactional
+    public CreateUserDto signup(SignupRequest request) {
         logger.info("회원가입 시작 - LoginType: {}, Provider: {}, Nickname: {}", 
                    request.getLoginType(), request.getProvider(), request.getNickname());
         
@@ -114,7 +115,10 @@ public class SignupService {
             accountRepository.save(account);
             logger.info("회원가입 완료 - UserId: {}, LoginType: {}", user.getId(), account.getLoginType());
 
-            return user;
+            return new CreateUserDto(
+                    account,
+                    user
+            );
         } catch (Exception e) {
             logger.error("회원가입 실패 - LoginType: {}, Provider: {}, Error: {}", 
                         request.getLoginType(), request.getProvider(), e.getMessage(), e);
