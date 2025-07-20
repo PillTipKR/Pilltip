@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 
@@ -131,7 +132,7 @@ public class QuestionnaireQRUrlService {
     public List<QuestionnaireQRUrlResponse> getAllQRUrl(String hospitalCode) {
         List<QuestionnaireQRUrl> qrUrl = qrUrlRepository.findByHospitalCodeWithUser(hospitalCode);
         if (qrUrl.isEmpty()) {
-            throw new IllegalArgumentException("QR URL이 존재하지 않습니다.");
+            return new ArrayList<>();
         }
         return qrUrl.stream()
             .map(qr -> {
