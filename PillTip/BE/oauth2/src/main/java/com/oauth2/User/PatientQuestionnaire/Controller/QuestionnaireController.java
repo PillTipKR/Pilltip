@@ -436,9 +436,6 @@ public class QuestionnaireController {
             
             List<QuestionnaireQRUrlResponse> response = questionnaireQRUrlService.getAllQRUrl(hospitalCode);
             return ResponseEntity.ok(ApiResponse.success(QuestionnaireMessageConstants.QR_URL_RETRIEVE_SUCCESS, response));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(404)
-                .body(ApiResponse.error("QR URL을 찾을 수 없습니다.", null));
         } catch (Exception e) {
             logger.error("QR URL retrieve failed: {}", e.getMessage(), e);
             return ResponseEntity.status(500)

@@ -63,9 +63,9 @@ public class AccountService {
                     new UserListDto(
                             users.getId(),
                             users.getNickname(),
-                            users.getUserProfile().getAge(),
-                            users.getUserProfile().getGender().name(),
-                            users.getUserProfile().getBirthDate().toString(),
+                            users.getUserProfile() != null ? users.getUserProfile().getAge() : null,
+                            users.getUserProfile() != null && users.getUserProfile().getGender() != null ? users.getUserProfile().getGender().name() : null,
+                            users.getUserProfile() != null && users.getUserProfile().getBirthDate() != null ? users.getUserProfile().getBirthDate().toString() : null,
                             users.isMain(),
                             users.getId().equals(profileId)
                     )
