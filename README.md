@@ -58,7 +58,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 **기술 스택**
 - **Frontend**: Kotlin, Android, Jetpacl Compose, Hilt
 - **Backend**: Java, Spring Boot, elasticsearch, redis, NGiNX, Next.js
-- **Design**: Figma, Adobe Illustrator, Adobe Photoshop, Rotato
+- **Design**: Figma, Adobe Illustrator, Adobe Photoshop
   
 **사용된 API 및 서비스**
 - 공공데이터포털 | 식품의약품안전처
