@@ -157,27 +157,8 @@ public class DrugImportService {
         String filteredUsage = filterContent(usage);
         String filteredCaution = filterContent(caution);
 
-        if (!filteredEffect.isEmpty()) {
-            DrugEffect de = new DrugEffect();
-            de.setDrug(drug);
-            de.setType(DrugEffect.Type.EFFECT);
-            de.setContent(filteredEffect.trim());
-            drugEffectService.save(de);
-        }
-        if (!filteredUsage.isEmpty()) {
-            DrugEffect de = new DrugEffect();
-            de.setDrug(drug);
-            de.setType(DrugEffect.Type.USAGE);
-            de.setContent(filteredUsage.trim());
-            drugEffectService.save(de);
-        }
-        if (!filteredCaution.isEmpty()) {
-            DrugEffect de = new DrugEffect();
-            de.setDrug(drug);
-            de.setType(DrugEffect.Type.CAUTION);
-            de.setContent(filteredCaution.trim());
-            drugEffectService.save(de);
-        }
+        //effect 저장
+        saveAllEffect(drug, filteredUsage,filteredEffect,filteredCaution);
 
         /*
         - 온도조건: 실온에서 보관한다.
@@ -229,6 +210,23 @@ public class DrugImportService {
         drugStorageConditionService.save(pack);
         drugStorageConditionService.save(humid);
         drugStorageConditionService.save(light);
+    }
+
+
+    private void saveAllEffect(Drug drug, String usage, String effect, String caution) {
+        saveEffect(drug, DrugEffect.Type.USAGE, usage);
+        saveEffect(drug, DrugEffect.Type.EFFECT, effect);
+        saveEffect(drug, DrugEffect.Type.CAUTION, caution);
+    }
+
+    private void saveEffect(Drug drug, DrugEffect.Type type, String content){
+        if (!content.isEmpty()) {
+            DrugEffect de = new DrugEffect();
+            de.setDrug(drug);
+            de.setContent(content);
+            de.setType(type);
+            drugEffectService.save(de);
+        }
     }
 
 

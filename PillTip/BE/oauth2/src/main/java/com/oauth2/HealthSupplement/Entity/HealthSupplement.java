@@ -16,24 +16,23 @@ public class HealthSupplement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(columnDefinition = "TEXT")
     private String enterprise;         // 업체명
+
+    @Column(columnDefinition = "TEXT")
     private String productName;        // 제품명
-    private String statementNo;        // 신고번호
+
+    @Column(columnDefinition = "TEXT")
     private String registerDate;       // 등록일자
-    private String distributionPeriod; // 유통기한
 
     @Column(columnDefinition = "TEXT")
-    private String appearance;         // 성상
+    private String validTerm;          // 유효기간
+
+    private String form;         // 성상
 
     @Column(columnDefinition = "TEXT")
-    private String servingMethod;      // 섭취방법
+    private String dispos;         // 성상의 특징
 
     @Column(columnDefinition = "TEXT")
-    private String preservation;       // 보존방법
-
-    @Column(columnDefinition = "TEXT")
-    private String intakeCaution;      // 섭취시 주의사항
-
-    @Column(columnDefinition = "TEXT")
-    private String mainFunction;       // 주요 기능성
+    private String rawMaterial;  // 추출물 이름 저장
 }
