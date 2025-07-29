@@ -4,13 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "supplement_ingredient")
+@Table(name = "health_supplement_ingredient")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SupplementIngredient {
+public class HealthSupplementIngredient {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,8 +25,5 @@ public class SupplementIngredient {
     private HealthIngredient ingredient;
 
     private Double amount;            // 표시량 (기준량)
-
-    private Double minRatio = 0.0;          // 최소 허용 비율 (예: 0.8)
-
-    private Double maxRatio = 0.0;          // 최대 허용 비율 (예: 1.5)
+    private String unit;              // 단위 (예: mg, ㎍, mgNE, mgα-TE 등)
 }
