@@ -30,6 +30,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     JOIN u.takingPills tp
     JOIN tp.dosageSchedules ds
     WHERE t.loggedIn = true
+    AND t.FCMToken IS NOT NULL
+    AND t.FCMToken != ''
     AND u.userPermissions.phonePermission = true
     AND ds.alarmOnOff = true
     """)
