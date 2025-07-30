@@ -27,6 +27,12 @@ public class AlarmService {
     private final AccountRepository accountRepository;
 
     public void sendMedicationAlarm(String fcmToken, Long id, String alertTitle, String pillName) {
+        // FCM 토큰 검증
+        if (fcmToken == null || fcmToken.trim().isEmpty()) {
+            logger.warn("FCM token is null or empty for dosage log ID: {}", id);
+            return;
+        }
+
         Message message = Message.builder()
                 .setToken(fcmToken)
                 .putData("logId", String.valueOf(id))

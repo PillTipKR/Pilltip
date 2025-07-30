@@ -11,6 +11,9 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.apache.catalina.connector.ClientAbortException;
+import java.io.IOException;
 
 import static com.oauth2.Util.Exception.Model.ErrorCode.*;
 
@@ -417,9 +420,45 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, response.getStatus());
     }
 
+    // 클라이언트 연결 중단 관련 예외 처리
+    @ExceptionHandler
+    protected ResponseEntity<ErrorResponse> handleAsyncRequestNotUsableException(AsyncRequestNotUsableException e) {
+        log.warn("Client connection was aborted: {}", e.getMessage());
+        // 클라이언트가 연결을 끊었으므로 응답을 보낼 필요가 없음
+        return null;
+    }
+
+    @ExceptionHandler
+    protected ResponseEntity<ErrorResponse> handleClientAbortException(ClientAbortException e) {
+        log.warn("Client connection was aborted: {}", e.getMessage());
+        // 클라이언트가 연결을 끊었으므로 응답을 보낼 필요가 없음
+        return null;
+    }
+
+    // IOException (Broken pipe 등) 처리
+    @ExceptionHandler
+    protected ResponseEntity<ErrorResponse> handleIOException(IOException e) {
+        if (e.getMessage() != null && e.getMessage().contains("Broken pipe")) {
+            log.warn("Client connection was aborted (Broken pipe): {}", e.getMessage());
+            return null;
+        }
+        log.error("IO Exception occurred: ", e);
+        final ErrorResponse response = ErrorResponse.of(INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(response, response.getStatus());
+    }
+
     // 그 밖에 발생하는 모든 예외처리가 이곳으로 모인다.
     @ExceptionHandler(Exception.class)
     protected ResponseEntity<ErrorResponse> handleException(Exception e) {
+        // 클라이언트 연결 중단 관련 예외는 로그만 남기고 응답하지 않음
+        if (e instanceof AsyncRequestNotUsableException || 
+            e instanceof ClientAbortException ||
+            e.getCause() instanceof ClientAbortException ||
+            (e instanceof IOException && e.getMessage() != null && e.getMessage().contains("Broken pipe"))) {
+            log.warn("Client connection was aborted during exception handling: {}", e.getMessage());
+            return null;
+        }
+        
         log.error("CustomException: ", e);
         final ErrorResponse response = ErrorResponse.of(INTERNAL_SERVER_ERROR);
         return new ResponseEntity<>(response, response.getStatus());
