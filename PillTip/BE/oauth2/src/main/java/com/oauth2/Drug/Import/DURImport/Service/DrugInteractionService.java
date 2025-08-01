@@ -47,7 +47,7 @@ public class DrugInteractionService {
         parseIngredientInteraction(interaction);
     }
 
-    public void parseInteractionCautions(String path) throws IOException {
+    private void parseInteractionCautions(String path) throws IOException {
         String content = Files.readString(Paths.get(path));
         String[] lines = content.split("\n"); // 전체 내용에서 라인별로 나누기
 
@@ -139,6 +139,8 @@ public class DrugInteractionService {
                     for(Long id2: drugId2){
                         if(!drugInteractionRepository.findByDrugId1AndDrugId2(id1,id2).isEmpty()) continue;
                         saveIngredientInteraction(id1, id2, reason, note);
+                        if(!drugInteractionRepository.findByDrugId1AndDrugId2(id2,id1).isEmpty()) continue;
+                        saveIngredientInteraction(id2, id1, reason, note);
                     }
                 }
             }

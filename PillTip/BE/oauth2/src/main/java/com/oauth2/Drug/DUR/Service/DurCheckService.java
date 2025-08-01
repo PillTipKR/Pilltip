@@ -13,6 +13,7 @@ import com.oauth2.User.TakingPill.Dto.TakingPillSummaryResponse;
 import com.oauth2.User.TakingPill.Service.TakingPillService;
 import com.oauth2.User.UserInfo.Entity.UserProfile;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -29,35 +30,56 @@ public class DurCheckService {
     private final DrugRepository drugRepository;
     private final TakingPillService takingPillService;
 
-    public List<DurTagDto> checkForDrug(Drug drug, UserProfile userProfile, DurUserContext userContext) throws JsonProcessingException {
+    @Value("${redis.supplement.drug.detail.tag}")
+    private String supDrugDetailTag;
+
+    @Value("${redis.drug.inter.detail.tag}")
+    private String drugDetailTag;
+
+    @Value("${redis.drug.inter.tag}")
+    private String drugInterTag;
+
+    public List<DurTagDto> checkForWithoutInteraction(Drug drug, UserProfile userProfile, DurUserContext userContext) throws JsonProcessingException {
         List<DurTagDto> tags = new ArrayList<>();
         Long drugId = drug.getId();
-        String drugName = drug.getName();
-
-        // 병용금기 (사용자가 복용중인 다른 약물과의 상호작용)
-        tags.add(buildContraTag(drugName, userContext.userInteractionDrugNames()));
 
         // 임부금기
-        tags.add(buildDurTag("임부금기", readJsonFromRedis("DUR:PREGNANCY:" + drugId), userProfile.isPregnant()));
+        tags.add(buildDurTag("임부금기", readJsonFromRedis("DRUG:DUR:PREGNANCY:" + drugId), userProfile.isPregnant()));
 
         // 노인금기
-        tags.add(buildDurTag("노인금기", readJsonFromRedis("DUR:ELDER:" + drugId), userContext.isElderly()));
+        tags.add(buildDurTag("노인금기", readJsonFromRedis("DRUG:DUR:ELDER:" + drugId), userContext.isElderly()));
 
         // 연령금기
-        Map<String, String> ageValue = readJsonFromRedis("DUR:AGE:" + drugId);
+        Map<String, String> ageValue = readJsonFromRedis("DRUG:DUR:AGE:" + drugId);
         boolean showAgeTag = ageValue != null && isUserInRestrictedAge(userProfile.getBirthDate(), ageValue.get("conditionValue"));
         tags.add(buildDurTag("연령금기", ageValue, showAgeTag));
 
         // 효능군 중복주의
-        Map<String, String> therValue = readJsonFromRedis("DUR:THERAPEUTIC_DUP:" + drugId);
+        Map<String, String> therValue = readJsonFromRedis("DRUG:DUR:THERAPEUTIC_DUP:" + drugId);
         String className = therValue != null ? therValue.get("className") : null;
-        boolean isDup = className != null && userContext.classToDrugIdsMap().containsKey(className);
+        boolean isDup = className != null && userContext.classToProductIdsMap().containsKey(className);
         tags.add(buildDurTag("효능군중복주의", therValue, isDup));
 
         return tags;
     }
 
-    private Map<String, String> readJsonFromRedis(String key) throws JsonProcessingException {
+    public List<DurTagDto> checkForDrugAndSupplement(Drug drug, UserProfile userProfile,
+                                        DurUserContext drugUserContext, DurUserContext supplementUserContext) throws JsonProcessingException {
+        List<DurTagDto> tags = checkForWithoutInteraction(drug,userProfile,drugUserContext);
+        String drugName = drug.getName();
+
+        tags.add(
+                buildDrugSupplementContraTag(drugName,
+                drugUserContext.userInteractionProductNames(),
+                supplementUserContext.userInteractionProductNames(),
+                supDrugDetailTag,
+                drugDetailTag
+        ));
+
+        return tags;
+    }
+
+    public Map<String, String> readJsonFromRedis(String key) throws JsonProcessingException {
         String json = redisTemplate.opsForValue().get(key);
         return (json != null) ? objectMapper.readValue(json, new TypeReference<>() {}) : null;
     }
@@ -76,12 +98,12 @@ public class DurCheckService {
             if (userDrugOpt.isEmpty()) continue;
 
             String drugName = userDrugOpt.get().getName();
-            List<String> contraList = redisTemplate.opsForList().range("DUR:INTERACT:" + drugName, 0, -1);
+            List<String> contraList = redisTemplate.opsForList().range(drugInterTag + drugName, 0, -1);
             if (contraList != null && !contraList.isEmpty()) {
                 userInteractionDrugNames.add(drugName);
             }
 
-            Map<String, String> value = readJsonFromRedis("DUR:THERAPEUTIC_DUP:" + userDrugId);
+            Map<String, String> value = readJsonFromRedis("DRUG:DUR:THERAPEUTIC_DUP:" + userDrugId);
             if (value != null) {
                 String className = value.getOrDefault("className", "").trim();
                 if (!className.isBlank()) {
@@ -92,7 +114,7 @@ public class DurCheckService {
         return new DurUserContext(isElderly, user.getUserProfile().isPregnant(), classToDrugIdsMap, userInteractionDrugNames);
     }
 
-    private DurTagDto buildDurTag(String tagName, Map<String, String> valueMap, boolean shouldTag) {
+    public DurTagDto buildDurTag(String tagName, Map<String, String> valueMap, boolean shouldTag) {
         List<DurDto> list = new ArrayList<>();
         if (shouldTag && valueMap != null && !valueMap.isEmpty()) {
             list.add(new DurDto(
@@ -104,23 +126,49 @@ public class DurCheckService {
         return new DurTagDto(tagName, list, shouldTag && !list.isEmpty());
     }
 
-    private DurTagDto buildContraTag(String drugName, Set<String> userInteractionDrugNames) throws JsonProcessingException {
-        List<DurDto> tagDesc = new ArrayList<>();
-        for (String otherName : userInteractionDrugNames) {
-            String detailKey = "DUR:INTERACT_DETAIL:" + drugName + ":" + otherName;
-            Map<String, String> detail = readJsonFromRedis(detailKey);
-            if (detail != null) {
-                tagDesc.add(new DurDto(
-                        drugName + " + " + otherName,
-                        detail.getOrDefault("reason", ""),
-                        detail.getOrDefault("note", "")
-                ));
-            }
+    // 방향 플래그를 받아서 detailKey 생성
+    private void tryAddInteraction(String name1, String tag, String name2, boolean reverseKey, List<DurDto> tagDesc) throws JsonProcessingException {
+        String key = reverseKey ? (name1 + ":" + name2) : (name2 + ":" + name1);
+        String detailKey = tag + key;
+
+        Map<String, String> detail = readJsonFromRedis(detailKey);
+        if (detail != null) {
+            tagDesc.add(new DurDto(
+                    name1 + " + " + name2,
+                    detail.getOrDefault("reason", ""),
+                    detail.getOrDefault("note", "")
+            ));
         }
+    }
+
+    // 반복하면서 방향 정보까지 넘겨줌
+    public void collectInteractionTags(String drugName, Set<String> others, String tag, boolean reverseKey, List<DurDto> tagDesc) throws JsonProcessingException {
+        for (String otherName : others) {
+            tryAddInteraction(otherName, tag, drugName, reverseKey, tagDesc);
+        }
+    }
+
+    // 메인: 각각 방향 다르게 설정
+    public DurTagDto buildDrugSupplementContraTag(
+            String drugName,
+            Set<String> userInteractionDrugNames,
+            Set<String> userInteractionSupplementNames,
+            String tag1,
+            String tag2
+    ) throws JsonProcessingException {
+        List<DurDto> tagDesc = new ArrayList<>();
+
+        // 건강기능식품 → drugName이 뒤에 (reverseKey = true)
+        collectInteractionTags(drugName, userInteractionSupplementNames, tag1, true, tagDesc);
+
+        // 약물 → drugName이 앞에 (reverseKey = false)
+        collectInteractionTags(drugName, userInteractionDrugNames, tag2, false, tagDesc);
+
         return new DurTagDto("병용금기", tagDesc, !tagDesc.isEmpty());
     }
 
-    private boolean isUserInRestrictedAge(LocalDate birthDate, String conditionValue) {
+
+    public boolean isUserInRestrictedAge(LocalDate birthDate, String conditionValue) {
         if (conditionValue == null || birthDate == null || conditionValue.isBlank()) return false;
         LocalDate today = LocalDate.now();
         int age = Period.between(birthDate, today).getYears();

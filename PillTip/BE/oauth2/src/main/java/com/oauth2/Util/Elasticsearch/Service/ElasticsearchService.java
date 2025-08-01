@@ -18,10 +18,16 @@ public class ElasticsearchService {
 
 
     @Value("${elastic.autocomplete.index}")
-    private String autocomplete;
+    private String drugAutocomplete;
+
+    @Value("${elastic.supplement.autocomplete.index}")
+    private String supplementAutocomplete;
 
     @Value("${elastic.autocomplete.field}")
-    private String autocompleteField;
+    private String drugAutocompleteField;
+
+    @Value("${elastic.supplement.autocomplete.field}")
+    private String supplementAutocompleteField;
 
     private final ElasticsearchClient elasticsearchClient;
 
@@ -77,9 +83,13 @@ public class ElasticsearchService {
 
             s = s.query(q -> q
                     .bool(b -> {
-                            if(index.equals(autocomplete)) {
+                            if(index.equals(drugAutocomplete)) {
                                 b = b.must(m -> m.term(t -> t.field("type").value(field[0])));
-                                field[0] = autocompleteField;
+                                field[0] = drugAutocompleteField;
+                            }
+                            if(index.equals(supplementAutocomplete)) {
+                                b = b.must(m -> m.term(t -> t.field("type").value(field[0])));
+                                field[0] = supplementAutocompleteField;
                             }
 
                             b.minimumShouldMatch("1");
