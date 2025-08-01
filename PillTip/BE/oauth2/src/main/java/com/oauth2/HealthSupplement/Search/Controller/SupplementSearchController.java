@@ -80,7 +80,6 @@ public class SupplementSearchController {
                     .body(ApiResponse.error("User not authenticated", null));
         }
         List<SupplementSearchIndexDto> searchIndexDTOList = supplementSearchService.getSupplementSearch(input, field, pageSize, page);
-        System.out.println(searchIndexDTOList.size());
         List<SupplementSearchDurDto> result = supplementDurTaggingService.generateTagsForSupplements(user, searchIndexDTOList);
         return ResponseEntity.ok(ApiResponse.success(result));
     }

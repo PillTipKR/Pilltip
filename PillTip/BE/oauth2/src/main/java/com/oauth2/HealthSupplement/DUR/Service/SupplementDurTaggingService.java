@@ -39,6 +39,7 @@ public class SupplementDurTaggingService {
         Map<Long, HealthSupplement> supplementMap = healthSupplementRepository.findAllById(supplmentIds).stream()
                 .collect(Collectors.toMap(HealthSupplement::getId, hs->hs));
 
+        // 건기식 정보로 수정하기
         List<Long> takingPills = takingPillRepository.findByUser(user).stream()
                 .map(TakingPill::getId).toList();
 

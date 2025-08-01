@@ -1,7 +1,15 @@
 package com.oauth2.HealthSupplement.SupplementInfo.Entity;
 
+import com.oauth2.Drug.DrugInfo.Domain.DrugEffect;
+import com.oauth2.Drug.DrugInfo.Domain.DrugStorageCondition;
+import com.oauth2.Drug.Review.Domain.Review;
+import com.oauth2.HealthSupplement.Review.Entity.SupplementReview;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "health_supplement")
@@ -35,4 +43,13 @@ public class HealthSupplement {
 
     @Column(columnDefinition = "TEXT")
     private String rawMaterial;  // 추출물 이름 저장
+
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "supplement", cascade = CascadeType.ALL)
+    private Set<HealthSupplementEffect> supplementEffects;
+
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "supplement", cascade = CascadeType.ALL)
+    private Set<HealthSupplementStorageCondition> storageConditions;
+
+    @OneToMany(mappedBy = "supplement", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SupplementReview> reviews = new ArrayList<>();
 }

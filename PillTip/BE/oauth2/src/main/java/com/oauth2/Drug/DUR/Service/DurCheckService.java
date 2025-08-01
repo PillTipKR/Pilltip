@@ -39,6 +39,9 @@ public class DurCheckService {
     @Value("${redis.drug.inter.tag}")
     private String drugInterTag;
 
+    @Value("${redis.supplement.drug.tag}")
+    private String supplementInterTag;
+
     public List<DurTagDto> checkForWithoutInteraction(Drug drug, UserProfile userProfile, DurUserContext userContext) throws JsonProcessingException {
         List<DurTagDto> tags = new ArrayList<>();
         Long drugId = drug.getId();
@@ -98,10 +101,11 @@ public class DurCheckService {
             if (userDrugOpt.isEmpty()) continue;
 
             String drugName = userDrugOpt.get().getName();
-            List<String> contraList = redisTemplate.opsForList().range(drugInterTag + drugName, 0, -1);
-            if (contraList != null && !contraList.isEmpty()) {
-                userInteractionDrugNames.add(drugName);
-            }
+            List<String> drugContraList = redisTemplate.opsForList().range(drugInterTag + drugName, 0, -1);
+            List<String> supplementContraList = redisTemplate.opsForList().range(supplementInterTag + drugName, 0, -1);
+            if (drugContraList != null && !drugContraList.isEmpty()) userInteractionDrugNames.add(drugName);
+            if(supplementContraList != null && !supplementContraList.isEmpty()) userInteractionDrugNames.add(drugName);
+
 
             Map<String, String> value = readJsonFromRedis("DRUG:DUR:THERAPEUTIC_DUP:" + userDrugId);
             if (value != null) {
@@ -130,11 +134,10 @@ public class DurCheckService {
     private void tryAddInteraction(String name1, String tag, String name2, boolean reverseKey, List<DurDto> tagDesc) throws JsonProcessingException {
         String key = reverseKey ? (name1 + ":" + name2) : (name2 + ":" + name1);
         String detailKey = tag + key;
-
         Map<String, String> detail = readJsonFromRedis(detailKey);
         if (detail != null) {
             tagDesc.add(new DurDto(
-                    name1 + " + " + name2,
+                    reverseKey ? (name2 + "+" + name1) : (name1 + "+" + name2),
                     detail.getOrDefault("reason", ""),
                     detail.getOrDefault("note", "")
             ));
@@ -142,9 +145,9 @@ public class DurCheckService {
     }
 
     // 반복하면서 방향 정보까지 넘겨줌
-    public void collectInteractionTags(String drugName, Set<String> others, String tag, boolean reverseKey, List<DurDto> tagDesc) throws JsonProcessingException {
+    public void collectInteractionTags(String prodcutName, Set<String> others, String tag, boolean reverseKey, List<DurDto> tagDesc) throws JsonProcessingException {
         for (String otherName : others) {
-            tryAddInteraction(otherName, tag, drugName, reverseKey, tagDesc);
+            tryAddInteraction(otherName, tag, prodcutName, reverseKey, tagDesc);
         }
     }
 

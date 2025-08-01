@@ -28,13 +28,16 @@ public class SupplementDurCheckService {
     private final TakingPillService takingPillService;
 
     @Value("${redis.supplement.drug.detail.tag}")
-    private String supDrugDetailTag;
+    private String supplementDrugDetailTag;
 
     @Value("${redis.supplement.inter.detail.tag}")
     private String supplementInterDetailTag;
 
     @Value("${redis.supplement.drug.tag}")
     private String supDrugTag;
+
+    @Value("${redis.supplement.inter.tag}")
+    private String supplementInterTag;
 
     // 금기가 있는지 확인
     public List<DurTagDto> checkForSupplementWithoutInteraction(HealthSupplement supplement, UserProfile userProfile, DurUserContext userContext) throws JsonProcessingException {
@@ -65,14 +68,14 @@ public class SupplementDurCheckService {
                 buildSupplementDrugContraTag(supplementName,
                         drugUserContext.userInteractionProductNames(),
                         supplementUserContext.userInteractionProductNames(),
-                        supDrugDetailTag,
+                        supplementDrugDetailTag,
                         supplementInterDetailTag
                 ));
         return tags;
     }
 
     // 사용자가 먹는 건기식 기준 컨텍스트 생성
-    public DurUserContext buildUserContext(User user) throws JsonProcessingException {
+    public DurUserContext buildUserContext(User user) {
         boolean isElderly = user.getUserProfile().getAge() >= 65;
         Map<String, List<Long>> classToSupplementIdsMap = new HashMap<>();
         Set<String> userInteractionSupplementNames = new HashSet<>();
@@ -88,18 +91,10 @@ public class SupplementDurCheckService {
             if (userSupplementOpt.isEmpty()) continue;
 
             String supplementName = userSupplementOpt.get().getProductName();
-            List<String> contraList = redisTemplate.opsForList().range(supDrugTag + supplementName, 0, -1);
-            if (contraList != null && !contraList.isEmpty()) {
-                userInteractionSupplementNames.add(supplementName);
-            }
-
-            Map<String, String> value = durCheckService.readJsonFromRedis("SUPPLEMENT:DUR:THERAPEUTIC_DUP:" + userSupplementId);
-            if (value != null) {
-                String className = value.getOrDefault("className", "").trim();
-                if (!className.isBlank()) {
-                    classToSupplementIdsMap.computeIfAbsent(className, k -> new ArrayList<>()).add(userSupplementId);
-                }
-            }
+            List<String> contraDrugList = redisTemplate.opsForList().range(supDrugTag + supplementName, 0, -1);
+            List<String> supplementContraList = redisTemplate.opsForList().range(supplementInterTag, 0, -1);
+            if (contraDrugList != null && !contraDrugList.isEmpty()) userInteractionSupplementNames.add(supplementName);
+            if (supplementContraList != null && !supplementContraList.isEmpty()) userInteractionSupplementNames.add(supplementName);
         }
         return new DurUserContext(isElderly, user.getUserProfile().isPregnant(), classToSupplementIdsMap, userInteractionSupplementNames);
     }
