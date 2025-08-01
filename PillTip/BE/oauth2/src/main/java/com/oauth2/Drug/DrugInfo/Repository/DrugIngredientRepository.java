@@ -16,10 +16,13 @@ public interface DrugIngredientRepository extends JpaRepository<DrugIngredient, 
     Optional<DrugIngredient> findById(DrugIngredientId id);
 
     @Query("""
-        SELECT DISTINCT di.id.drugId
-        FROM DrugIngredient di, Ingredient i
-        WHERE di.id.ingredientId = i.id
-        AND ( i.nameEn like :name OR :name like i.nameEn)
-   \s""")
+    SELECT DISTINCT di.id.drugId
+    FROM DrugIngredient di
+    JOIN Ingredient i ON di.id.ingredientId = i.id
+    WHERE LOWER(i.nameEn) LIKE LOWER(CONCAT('%', :name, '%'))
+       OR LOWER(:name) LIKE LOWER(CONCAT('%', i.nameEn, '%'))
+    """)
     List<Long> findDrugIdsByIngredientName(@Param("name") String name);
+
+
 } 

@@ -13,15 +13,22 @@ import org.springframework.stereotype.Component;
 public class ElasticSeeder implements CommandLineRunner {
 
     //ElasticSearch 재생성 스위치
-    @Value("${elastic.seed}")
-    private boolean seed;
+    @Value("${elastic.drug.seed}")
+    private boolean drugSeed;
+
+    @Value("${elastic.supplement.seed}")
+    private boolean supplementSeed;
 
     private final DataSyncService dataSyncService;
     @Override
     public void run(String... args) throws Exception {
-        if(seed) {
-            dataSyncService.loadAll();
-            System.out.println("Index injection complete");
+        if(drugSeed) {
+            dataSyncService.loadDrug();
+            System.out.println("Drug Index injection complete");
+        }
+        if(supplementSeed) {
+            dataSyncService.loadSupplement();
+            System.out.println("Supplement Index injection complete");
         }
     }
 }

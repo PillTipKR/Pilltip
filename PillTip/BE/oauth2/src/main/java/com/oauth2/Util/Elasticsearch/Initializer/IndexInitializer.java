@@ -14,8 +14,17 @@ import java.util.List;
 public class IndexInitializer implements CommandLineRunner {
 
     //ElasticSearch 재생성 스위치
-    @Value("${elastic.seed}")
-    private boolean seed;
+    @Value("${elastic.drug.seed}")
+    private boolean drugSeed;
+
+    @Value("${elastic.allSearch}")
+    private String drugSearch;
+
+    @Value("${elastic.autocomplete.index}")
+    private String autocompleteIndex;
+
+    @Value("${elastic.supplement.seed}")
+    private boolean supplementSeed;
 
     private final IndexManager indexManager;
     private final List<IndexMappingProvider<?>> indexProviders;
@@ -27,11 +36,20 @@ public class IndexInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        if(seed) {
-            for (IndexMappingProvider<?> provider : indexProviders) {
-                indexManager.createIndex(provider);
-                System.out.println("Creating index in ES:" + provider.getIndexName());
+        for (IndexMappingProvider<?> provider : indexProviders) {
+            if(provider.getIndexName().equals(autocompleteIndex)
+                    || provider.getIndexName().equals(drugSearch)) {
+                if(drugSeed) {
+                    indexManager.createIndex(provider);
+                    System.out.println("Creating index in ES:" + provider.getIndexName());
+                }
+            }else{
+                if(supplementSeed) {
+                    indexManager.createIndex(provider);
+                    System.out.println("Creating index in ES:" + provider.getIndexName());
+                }
             }
+
         }
     }
 }

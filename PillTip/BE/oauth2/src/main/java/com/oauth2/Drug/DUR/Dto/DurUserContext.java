@@ -9,6 +9,6 @@ import java.util.Set;
 public record DurUserContext(
         boolean isElderly,
         boolean isPregnant,
-        Map<String, List<Long>> classToDrugIdsMap,
-        Set<String> userInteractionDrugNames
+        Map<String, List<Long>> classToProductIdsMap,
+        Set<String> userInteractionProductNames
 ) {}

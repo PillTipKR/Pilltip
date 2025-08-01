@@ -7,18 +7,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ElasticsearchProvider implements IndexMappingProvider<ElasticsearchDTO> {
+public class SupplementElasticsearchProvider implements IndexMappingProvider<ElasticsearchDTO> {
 
     private final CommonSettingsProvider settingsProvider;
 
-    public ElasticsearchProvider(CommonSettingsProvider settingsProvider) {
+    public SupplementElasticsearchProvider(CommonSettingsProvider settingsProvider) {
         this.settingsProvider = settingsProvider;
     }
 
-    @Value("${elastic.autocomplete.index}")
+    @Value("${elastic.supplement.autocomplete.index}")
     private String index;
 
-    @Value("${elastic.autocomplete.field}")
+    @Value("${elastic.supplement.autocomplete.field}")
     private String field;
 
     @Override
@@ -34,7 +34,7 @@ public class ElasticsearchProvider implements IndexMappingProvider<Elasticsearch
     @Override
     public TypeMapping getMapping() {
         return new TypeMapping.Builder()
-                .properties("type", p -> p.keyword(k -> k)) // drugName, ingredient 등
+                .properties("type", p -> p.keyword(k -> k))
                 .properties("id", p -> p.keyword(k -> k.index(false)))
                 .properties(field, p -> p
                         .text(t -> t
