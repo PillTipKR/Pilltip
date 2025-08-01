@@ -119,8 +119,7 @@ public class SupplementFileParser {
 
         //보관정보 저장
         String storage = fields.get("CSTDY_MTHD")!= null? cleanContent(filterContent(fields.get("CSTDY_MTHD"))):"";
-        if(!storage.isEmpty())
-            parseStorage(supplement, storage);
+        parseStorage(supplement, storage);
 
         // 성분 저장
         String ingr = fields.get("STDR_STND") != null ? cleanContentIng(fields.get("STDR_STND")):"";

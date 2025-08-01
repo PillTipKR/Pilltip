@@ -12,6 +12,7 @@ import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
 import com.oauth2.User.UserInfo.Entity.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,12 @@ public class SupplementDurService {
     private final DurCheckService durCheckService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+
+    @Value("${redis.supplement.drug.tag}")
+    private String supDrugTag;
+
+    @Value("${redis.supplement.drug.detail.tag}")
+    private String supDrugDetailTag;
 
     //건기식과 약 간의 상충작용비교 ( 필요하다면 사용하기 )
     public SupplementDurAnalysisResponse generateTagsForSupplementAndDrug(User user, long supplementId, long drugId) throws JsonProcessingException {
@@ -69,9 +76,9 @@ public class SupplementDurService {
         String drugName = drug.getName();
 
         // 병용금기 확인
-        List<String> contraList = redisTemplate.opsForList().range("SUPPLEMENT-DRUG:DUR:INTERACT:" + supplementName, 0, -1);
+        List<String> contraList = redisTemplate.opsForList().range(supDrugTag + supplementName, 0, -1);
         if (contraList != null && contraList.contains(drugName)) {
-            String detailKey = "SUPPLEMENT-DRUG:DUR:INTERACT_DETAIL:" + supplementName + ":" + drugName;
+            String detailKey = supDrugDetailTag + supplementName + ":" + drugName;
             Map<String, String> detail = readJsonFromRedis(detailKey);
             List<DurDto> tagDesc = new ArrayList<>();
             if (detail != null) {

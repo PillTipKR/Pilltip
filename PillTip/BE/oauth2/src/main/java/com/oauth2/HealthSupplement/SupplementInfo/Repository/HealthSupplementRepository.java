@@ -18,4 +18,11 @@ public interface HealthSupplementRepository extends JpaRepository<HealthSuppleme
     List<Long> findHealthSupplementsByRawMaterial(@Param("name") String name);
 
     Optional<HealthSupplement> findHealthSupplementById(Long id);
+
+    @Query("SELECT DISTINCT si FROM HealthSupplement si " +
+            "LEFT JOIN FETCH si.supplementEffects " +
+            "LEFT JOIN FETCH si.storageConditions " +
+            "WHERE si.id = :id")
+    Optional<HealthSupplement> findSuppelmentWithAllRelations(@Param("id") long id);
+
 }

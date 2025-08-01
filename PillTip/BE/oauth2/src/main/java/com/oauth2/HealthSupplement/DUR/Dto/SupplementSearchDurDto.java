@@ -11,7 +11,7 @@ public record SupplementSearchDurDto(
         Long id,
         String supplementName,
         List<SupplementIngrDetail> ingredients,
-        String manufacturer,
+        String enterprise,
         String imageUrl,
         List<DurTagDto> durTags,
         Boolean isTaking

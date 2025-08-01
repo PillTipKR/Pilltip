@@ -77,12 +77,7 @@ public class DurRedisLoader {
             redisTemplate.opsForValue().set(key1, json);
         }
 
-        for (var entry : map.entrySet()) {
-            String key = drugInterTag + entry.getKey();
-            List<String> ids = entry.getValue().stream().map(String::valueOf).toList();
-            redisTemplate.delete(key);
-            redisTemplate.opsForList().rightPushAll(key, ids);
-        }
+        pushKey(map,drugInterTag);
     }
 
     private void saveSupplementInteractions() throws JsonProcessingException {
@@ -110,13 +105,13 @@ public class DurRedisLoader {
             redisTemplate.opsForValue().set(key1, json);
         }
 
-        pushKey(supplementMap);
-        pushKey(drugMap);
+        pushKey(supplementMap,supplementDrugInterTag);
+        pushKey(drugMap,supplementDrugInterTag);
     }
 
-    private void pushKey(Map<String, List<String>> map) {
+    private void pushKey(Map<String, List<String>> map, String tag) {
         for (var entry : map.entrySet()) {
-            String key = supplementDrugInterTag + entry.getKey();
+            String key = tag + entry.getKey();
             List<String> ids = entry.getValue().stream().map(String::valueOf).toList();
             redisTemplate.delete(key);
             redisTemplate.opsForList().rightPushAll(key, ids);
