@@ -420,6 +420,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, response.getStatus());
     }
 
+    @ExceptionHandler
+    protected ResponseEntity<ErrorResponse> handleInvalidIngredientException(InvalidIngredientException e) {
+        final ErrorResponse response = ErrorResponse.of(INVALID_INGREDIENT, e.getMessage());
+        return new ResponseEntity<>(response, response.getStatus());
+    }
+
     // 클라이언트 연결 중단 관련 예외 처리
     @ExceptionHandler
     protected ResponseEntity<ErrorResponse> handleAsyncRequestNotUsableException(AsyncRequestNotUsableException e) {

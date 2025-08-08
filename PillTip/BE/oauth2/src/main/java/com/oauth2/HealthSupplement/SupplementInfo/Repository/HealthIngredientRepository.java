@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface HealthIngredientRepository extends JpaRepository<HealthIngredient, Integer> {
 
     Optional<HealthIngredient> findByName(String ingredientName);
+
+    List<HealthIngredient> findByNameContaining(String name);
 }

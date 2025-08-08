@@ -1,7 +1,8 @@
 package com.oauth2.HealthSupplement.Import.SupplementImport.Controller;
 
+import com.oauth2.HealthSupplement.Import.SupplementImport.Service.IntakeImportService;
+import com.oauth2.HealthSupplement.Import.SupplementImport.Service.RatioService;
 import com.oauth2.HealthSupplement.Import.SupplementImport.Service.SupplementFileParser;
-import com.oauth2.HealthSupplement.SupplementInfo.Service.SupplementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +17,8 @@ import java.io.IOException;
 public class SupplementImportController {
 
     private final SupplementFileParser supplementFileParser;
+    private final RatioService ratioService;
+    private final IntakeImportService intakeImportService;
 
     @Value("${supplement}")
     private String supplement;
@@ -26,4 +29,17 @@ public class SupplementImportController {
         supplementFileParser.importFromFile(supplement);
         return "import success";
     }
+
+    @PostMapping("/ratio")
+    private String importRatio() throws IOException {
+        ratioService.processRatioFile();
+        return "import success";
+    }
+
+    @PostMapping("/intake")
+    private String importIntake() throws IOException {
+        intakeImportService.parseAndSave();
+        return "import success";
+    }
+
 }
