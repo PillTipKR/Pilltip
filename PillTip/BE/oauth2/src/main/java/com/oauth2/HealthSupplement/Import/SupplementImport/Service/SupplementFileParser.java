@@ -107,6 +107,7 @@ public class SupplementFileParser {
                 .form(fields.get("PRDT_SHAP_CD_NM") != null? filterContent(fields.get("PRDT_SHAP_CD_NM")):"")
                 .dispos(fields.get("DISPOS") != null ? filterContent(fields.get("DISPOS")):"")
                 .rawMaterial(fields.get("RAWMTRL_NM") != null? cleanBlank(fields.get("RAWMTRL_NM")):"")
+                .indivMaterial(fields.get("INDIV_RAWMTRL_NM")!= null? cleanBlank(fields.get("INDIV_RAWMTRL_NM")):"")
                 .build();
 
         supplement = healthSupplementRepository.save(supplement);
@@ -687,7 +688,7 @@ public class SupplementFileParser {
         if(text.contains("코엔자임")) return "코엔자임Q10";
         if(text.contains("칼슘")) return "칼슘";
         if(text.contains("난소화성말토덱스트린")) return "난소화성말토덱스트린";
-        if(text.contains("엽산")) return "엽산";
+        if(text.contains("엽산")) return "비타민B9(엽산)";
         if(text.contains("인지질")) return "인지질";
         if(text.contains("prenylnaringenin")) return "8-프레닐나린게닌(8-Prenylnaringenin)";
         if(text.contains("acetylbritannilactone") || text.contains("아세틸브리타닐락톤")) return "1-O-아세틸브리타닐락톤(1-O-Acetylbritannilactone)";
@@ -737,7 +738,7 @@ public class SupplementFileParser {
         if ((text.contains("비타민c")) || (text.contains("acerola") && text.contains("cherry") && text.contains("extract")) || (text.contains("acid") && text.contains("ascorbic")) ) return "비타민C(AcerolaCherryExtract, Ascorbic Acid)";
         if ((text.contains("코디세핀")) || (text.contains("cordycepin"))) return "코디세핀(Cordycepin)";
         if ((text.contains("크레아틴")) || (text.contains("creatine"))) return "크레아틴(Creatine monohydrate)";
-        if ((text.contains("판토텐산")) || (text.contains("pantothenate"))) return "판토텐산(Calcium Pantothenate)";
+        if ((text.contains("판토텐산")) || (text.contains("pantothenate"))) return "비타민B5(판토텐산(Calcium Pantothenate))";
         if ( text.contains("비타민e") || text.contains("토코페롤") || text.contains("tocopherol")) return "비타민E(D-α-토코페롤(D-α-Tocopherol))";
         if ((text.contains("피니톨")) || (text.contains("pinitol") && text.contains("d"))) return "D-피니톨(D-pinitol)";
         if ((text.contains("커큐민")) || (text.contains("curcumin"))) return "커큐민(Curcumin)";
@@ -765,7 +766,7 @@ public class SupplementFileParser {
         if ((text.contains("플라보놀배당체")) || (text.contains("flavonol") && text.contains("glycosides"))) return "플라보놀배당체 (flavonol glycosides)";
         if ((text.contains("로이신")) || (text.contains("leucine") && text.contains("l"))) return "L-로이신(L-Leucine)";
         if ((text.contains("라우르산") || text.contains("로르산")) || (text.contains("acid") && text.contains("lauric"))) return "라우르산(Lauric acid)";
-        if ((text.contains("나이아신")) || text.contains("niacin")) return "나이아신(Niacin,Niacinarmide)";
+        if ((text.contains("나이아신")) || text.contains("niacin")) return "비타민B3(나이아신(Niacin,Niacinarmide))";
         if ((text.contains("나린진")) || (text.contains("naringin")) || text.contains("natto") || text.contains("나토")) return "나토균배양분말(나린진(Naringin))";
         if ((text.contains("쿠마르산")) || (text.contains("coumaric") || text.contains("acid"))) return "p-쿠마르산(p-Coumaric acid)";
         if (text.contains("비타민b6") || (text.contains("피리독신")) || (text.contains("pyridoxine") && text.contains("hydrochloride"))) return "비타민B6(피리독신(Pyridoxine Hydrochloride))";
@@ -852,9 +853,9 @@ public class SupplementFileParser {
         if ((text.contains("바이칼린")) || (text.contains("baicalin"))) return "바이칼린(Baicalin)";
         if ((text.contains("베타") && text.contains("시토스테롤")) || (text.contains("β") && text.contains("sitosterol"))) return "베타-시토스테롤(β-sitosterol)";
         if ((text.contains("베타인")) || (text.contains("betaine"))) return "베타인(Betaine)";
-        if (text.contains("HMB") || (text.contains("hydroxy") && text.contains("methylbutyric"))) return "HMB(β-Hydroxy β-methylbutyric acid)";
+        if (text.contains("hmb") || (text.contains("hydroxy") && text.contains("methylbutyric"))) return "HMB(β-Hydroxy β-methylbutyric acid)";
         if ((text.contains("벤질헥사데칸아미드")) || (text.contains("benzylhexadecanamide"))) return  "벤질헥사데칸아미드(Benzylhexadecanamide)";
-        if ((text.contains("비오틴")) || (text.contains("biotin"))) return "비오틴(Biotin)";
+        if ((text.contains("비오틴")) || (text.contains("biotin"))) return "비타민B7(비오틴(Biotin))";
         if ((text.contains("사우치논")) || (text.contains("sauchinone"))) return "사우치논(Sauchinone)";
         if ((text.contains("사포나린")) || (text.contains("saponarin"))) return "사포나린(Saponarin)";
         if ((text.contains("사포닌")) || (text.contains("saponin"))) return "사포닌(Saponin)";
@@ -909,7 +910,7 @@ public class SupplementFileParser {
         if ((text.contains("푸닉산")) || (text.contains("acid") && text.contains("punicic"))) return "푸닉산(Punicic acid)";
         if ((text.contains("플로리진")) || (text.contains("phloridzin"))) return "플로리진(Phloridzin)";
         if (text.contains("키토산")) return "키토산";
-        if(text.contains("니코틴산아미드")) return "니코틴산아미드(Nicotinamide)";
+        if(text.contains("니코틴산아미드")) return "비타민B3(니코틴산아미드(Nicotinamide))";
         if (text.contains("키토올리고당")) return "키토올리고당";
         if(text.contains("아밀라아제")) return "α-아밀라아제";
         if (text.contains("프로테아제")) return "프로테아제";

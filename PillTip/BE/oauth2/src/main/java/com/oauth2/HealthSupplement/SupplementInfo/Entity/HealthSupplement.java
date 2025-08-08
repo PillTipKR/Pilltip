@@ -42,6 +42,9 @@ public class HealthSupplement {
     private String dispos;         // 성상의 특징
 
     @Column(columnDefinition = "TEXT")
+    private String indivMaterial;  // 원료 추출물 이름 저장
+
+    @Column(columnDefinition = "TEXT")
     private String rawMaterial;  // 추출물 이름 저장
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "supplement", cascade = CascadeType.ALL)

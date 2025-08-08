@@ -114,8 +114,9 @@ public enum ErrorCode {
     NOT_EXIST_USER(HttpStatus.BAD_REQUEST, "U001", "사용자를 찾을 수 없습니다."),
     NOT_EXIST_DOSAGELOG(HttpStatus.BAD_REQUEST, "L001", "복용 기록을 찾을 수 없습니다."),
     MISSING_FCMTOKEN(HttpStatus.BAD_REQUEST, "A001", "알림 토큰이 없습니다."),
-    NOT_FRIEND(HttpStatus.BAD_REQUEST, "F001", "친구가 아닙니다.");
+    NOT_FRIEND(HttpStatus.BAD_REQUEST, "F001", "친구가 아닙니다."),
 
+    INVALID_INGREDIENT(HttpStatus.BAD_REQUEST, "I001", "해당 성분을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
