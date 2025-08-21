@@ -52,7 +52,7 @@ public class SupplementDurCheckService {
 
         // 연령금기
         Map<String, String> ageValue = durCheckService.readJsonFromRedis("SUPPLEMENT:DUR:AGE:" + supplementId);
-        boolean showAgeTag = ageValue != null && durCheckService.isUserInRestrictedAge(userProfile.getBirthDate(), ageValue.get("conditionValue"));
+        boolean showAgeTag = ageValue != null && userProfile.getAge() <= 12;
         tags.add(durCheckService.buildDurTag("연령금기", ageValue, showAgeTag));
 
         return tags;

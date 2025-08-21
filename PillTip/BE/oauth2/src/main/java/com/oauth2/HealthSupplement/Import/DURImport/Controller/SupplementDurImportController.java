@@ -1,5 +1,6 @@
 package com.oauth2.HealthSupplement.Import.DURImport.Controller;
 
+import com.oauth2.HealthSupplement.Import.DURImport.Service.HealthSupplementCautionService;
 import com.oauth2.HealthSupplement.Import.DURImport.Service.SupplementInteractionService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import java.io.IOException;
 public class SupplementDurImportController {
 
     private final SupplementInteractionService supplementInteractionService;
+    private final HealthSupplementCautionService healthSupplementCautionService;
     private final Logger logger = LoggerFactory.getLogger(SupplementDurImportController.class);
 
 
@@ -29,5 +31,11 @@ public class SupplementDurImportController {
             logger.error("Error occurred in import interaction: {}", e.getMessage());
             return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
         }
+    }
+
+    @PostMapping("")
+    public ResponseEntity<String> saveDur() throws IOException {
+        healthSupplementCautionService.load();
+        return ResponseEntity.ok("저장 완료!");
     }
 }

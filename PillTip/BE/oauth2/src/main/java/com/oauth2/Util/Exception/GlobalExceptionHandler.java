@@ -421,8 +421,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler
-    protected ResponseEntity<ErrorResponse> handleInvalidIngredientException(InvalidIngredientException e) {
-        final ErrorResponse response = ErrorResponse.of(INVALID_INGREDIENT, e.getMessage());
+    protected ResponseEntity<ErrorResponse> handleNotExistIngredientException(NotExistIngredientException e) {
+        final ErrorResponse response = ErrorResponse.of(NOT_EXIST_INGREDIENT, e.getMessage());
+        return new ResponseEntity<>(response, response.getStatus());
+    }
+
+    @ExceptionHandler
+    protected ResponseEntity<ErrorResponse> handleNotExistSupplementException(NotExistSupplementException e) {
+        final ErrorResponse response = ErrorResponse.of(NOT_EXIST_SUPPLEMENT, e.getMessage());
         return new ResponseEntity<>(response, response.getStatus());
     }
 

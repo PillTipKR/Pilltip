@@ -116,7 +116,8 @@ public enum ErrorCode {
     MISSING_FCMTOKEN(HttpStatus.BAD_REQUEST, "A001", "알림 토큰이 없습니다."),
     NOT_FRIEND(HttpStatus.BAD_REQUEST, "F001", "친구가 아닙니다."),
 
-    INVALID_INGREDIENT(HttpStatus.BAD_REQUEST, "I001", "해당 성분을 찾을 수 없습니다.");
+    NOT_EXIST_INGREDIENT(HttpStatus.BAD_REQUEST, "I001", "해당 성분을 찾을 수 없습니다."),
+    NOT_EXIST_SUPPLEMENT(HttpStatus.BAD_REQUEST, "I002", "해당 건강기능식품을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
