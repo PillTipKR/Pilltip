@@ -8,6 +8,7 @@ import com.oauth2.Drug.Review.Domain.ReviewLike;
 import com.oauth2.Account.Entity.Account;
 import com.oauth2.User.PatientQuestionnaire.Entity.PatientQuestionnaire;
 import com.oauth2.User.TakingPill.Entity.TakingPill;
+import com.oauth2.User.TakingSupplement.Entity.TakingSupplement;
 import com.oauth2.Util.Encryption.EncryptionConverter;
 
 import jakarta.persistence.*;
@@ -90,6 +91,12 @@ public class User {
     @JsonManagedReference
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TakingPill> takingPills;
+
+    // 복용 중인 약 1대 N 관계
+    @JsonManagedReference
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TakingSupplement> takingSupplements;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id")

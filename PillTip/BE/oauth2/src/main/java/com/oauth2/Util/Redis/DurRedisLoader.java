@@ -10,7 +10,9 @@ import com.oauth2.Drug.DUR.Repository.DrugCautionRepository;
 import com.oauth2.Drug.DUR.Repository.DrugInteractionRepository;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
 import com.oauth2.Drug.DUR.Repository.DrugTherapeuticDupRepository;
+import com.oauth2.HealthSupplement.DUR.Entity.HealthSupplementCaution;
 import com.oauth2.HealthSupplement.DUR.Entity.HealthSupplementInteraction;
+import com.oauth2.HealthSupplement.DUR.Repository.HealthSupplementCautionRepository;
 import com.oauth2.HealthSupplement.DUR.Repository.SupplementInteractionRepository;
 import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
@@ -32,7 +34,8 @@ public class DurRedisLoader {
     private final StringRedisTemplate redisTemplate;
     private final DrugInteractionRepository drugInteractionRepository;
     private final SupplementInteractionRepository supplementInteractionRepository;
-    private final DrugCautionRepository cautionRepo;
+    private final DrugCautionRepository drugCautionRepository;
+    private final HealthSupplementCautionRepository healthSupplementCautionRepository;
     private final DrugTherapeuticDupRepository dupRepo;
     private final ObjectMapper objectMapper;
     private final DrugRepository drugRepository;
@@ -53,7 +56,8 @@ public class DurRedisLoader {
     public void loadAll() throws JsonProcessingException {
         saveDrugInteractions();
         saveSupplementInteractions();
-        saveCautions();
+        saveDrugCautions();
+        saveSupplementCautions();
         saveTherapeuticDups();
     }
 
@@ -118,14 +122,27 @@ public class DurRedisLoader {
         }
     }
 
-    private void saveCautions() throws JsonProcessingException {
-        List<DrugCaution> cautions = cautionRepo.findAll();
+    private void saveDrugCautions() throws JsonProcessingException {
+        List<DrugCaution> cautions = drugCautionRepository.findAll();
 
         for (DrugCaution dc : cautions) {
             String key = "DRUG:DUR:" + dc.getConditionType().name() + ":" + dc.getDrugId();
             Map<String, String> value = Map.of(
                     "conditionValue", dc.getConditionValue() == null ? "" : dc.getConditionValue(),
                     "note", dc.getNote() == null ? "" : dc.getNote()
+            );
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value));
+        }
+    }
+
+    private void saveSupplementCautions() throws JsonProcessingException {
+        List<HealthSupplementCaution> cautions = healthSupplementCautionRepository.findAll();
+
+        for (HealthSupplementCaution hc : cautions) {
+            String key = "SUPPLEMENT:DUR:" + hc.getConditionType().name() + ":" + hc.getSupplementId();
+            Map<String, String> value = Map.of(
+                    "conditionValue", "",
+                    "note", ""
             );
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value));
         }

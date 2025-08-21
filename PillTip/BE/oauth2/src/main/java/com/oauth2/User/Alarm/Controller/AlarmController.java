@@ -4,6 +4,7 @@ import com.oauth2.Account.Service.AccountService;
 import com.oauth2.Account.Entity.Account;
 import com.oauth2.User.Alarm.Service.AlarmService;
 import com.oauth2.Account.Dto.ApiResponse;
+import com.oauth2.User.TakingSupplement.Service.SupplementLogService;
 import com.oauth2.User.UserInfo.Entity.User;
 import com.oauth2.User.UserInfo.Repository.UserRepository;
 import com.oauth2.User.Alarm.Dto.AlarmMessageConstants;
@@ -26,6 +27,7 @@ public class AlarmController {
 
     private final AlarmService alarmService;
     private final DosageLogService dosageLogService;
+    private final SupplementLogService supplementLogService;
     private final UserRepository userRepository;
     private final FriendService friendService;
     private final AccountService accountService;
@@ -42,7 +44,7 @@ public class AlarmController {
     }
 
 
-    @PostMapping("/{logId}/pending")
+    @PostMapping("/drug/{logId}/pending")
     public ResponseEntity<ApiResponse<String>> markPending(@PathVariable Long logId) {
         try {
             dosageLogService.markPending(logId);
@@ -53,8 +55,8 @@ public class AlarmController {
     }
 
 
-    @PostMapping("/{logId}/taken")
-    public ResponseEntity<ApiResponse<String>> markAsTaken(
+    @PostMapping("/drug/{logId}/taken")
+    public ResponseEntity<ApiResponse<String>> markAsDrugTaken(
             @PathVariable Long logId) {
         try {
             dosageLogService.alarmTaken(logId);
@@ -64,6 +66,26 @@ public class AlarmController {
         }
     }
 
+    @PostMapping("/supplement/{logId}/pending")
+    public ResponseEntity<ApiResponse<String>> markSupplementPending(@PathVariable Long logId) {
+        try {
+            supplementLogService.markPending(logId);
+            return ResponseEntity.ok().body(ApiResponse.success(AlarmMessageConstants.ALARM_RESEND_SUCCESS));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(AlarmMessageConstants.ALARM_RESEND_FAILED, null));
+        }
+    }
+
+    @PostMapping("/supplement/{logId}/taken")
+    public ResponseEntity<ApiResponse<String>> markAsSupplementTaken(
+            @PathVariable Long logId) {
+        try {
+            supplementLogService.alarmTaken(logId);
+            return ResponseEntity.ok().body(ApiResponse.success(AlarmMessageConstants.DOSAGE_HISTORY_UPDATE_SUCCESS));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(AlarmMessageConstants.DOSAGE_HISTORY_UPDATE_FAILED, null));
+        }
+    }
 
     // 안 먹은 친구 콕 찌르기
     @GetMapping("/{friendId}/{logId}")
