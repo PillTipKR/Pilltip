@@ -37,6 +37,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
     """)
     List<AlarmDto> findAllActiveUsersWithPillInfo();
 
+    @Query("""
+    SELECT new com.oauth2.User.Alarm.Dto.AlarmDto(
+        u.id, t.FCMToken
+    )
+    FROM User u
+    JOIN u.account a
+    JOIN a.FCMToken t
+    JOIN u.takingSupplements ts
+    JOIN ts.supplementSchedules ss
+    WHERE t.loggedIn = true
+    AND t.FCMToken IS NOT NULL
+    AND t.FCMToken != ''
+    AND u.userPermissions.phonePermission = true
+    AND ss.alarmOnOff = true
+    """)
+    List<AlarmDto> findAllActiveUsersWithSupplementInfo();
+
     // 현재 사용자 정보 조회 (questionnaire 포함)
     @Query("""
     SELECT u FROM User u
