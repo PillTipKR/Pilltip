@@ -1,6 +1,7 @@
 package com.pilltip.pilltip.model.signUp
 
 import android.content.Context
+import androidx.core.content.edit
 
 object TokenManager {
     private const val PREF_NAME = "user"
@@ -25,6 +26,6 @@ object TokenManager {
             .getString(KEY_REFRESH, null)
 
     fun clear(context: Context) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit().clear().apply()
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit { clear() }
     }
 }

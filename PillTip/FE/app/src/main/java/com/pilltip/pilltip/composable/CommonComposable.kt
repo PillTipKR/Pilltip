@@ -415,7 +415,8 @@ fun PillTipDatePicker(
 
     val yearListState = rememberLazyListState(yearMonth.year - 1900)
     val monthListState = rememberLazyListState(yearMonth.monthValue - 1)
-    val dayListState = rememberLazyListState(0)
+    val today = LocalDate.now()
+    val dayListState = rememberLazyListState(today.dayOfMonth - 1)
 
     val density = LocalDensity.current
     val threshold = remember { density.run { 20.dp.toPx() } }
@@ -659,3 +660,4 @@ fun AppBar(
         } else Box(Modifier.size(RNBSize))
     }
 }
+

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -59,6 +60,7 @@ import com.pilltip.pilltip.composable.noRippleClickable
 import com.pilltip.pilltip.ui.theme.gray050
 import com.pilltip.pilltip.ui.theme.gray200
 import com.pilltip.pilltip.ui.theme.gray500
+import com.pilltip.pilltip.ui.theme.gray600
 import com.pilltip.pilltip.ui.theme.gray800
 import com.pilltip.pilltip.ui.theme.pretendard
 import com.pilltip.pilltip.ui.theme.primaryColor
@@ -118,6 +120,7 @@ fun ProfileStepDescription(
 
 @Composable
 fun RoundTextField(
+    modifier: Modifier = Modifier,
     text: String,
     textChange: (String) -> Unit,
     placeholder: String,
@@ -131,18 +134,20 @@ fun RoundTextField(
     BasicTextField(
         value = text,
         onValueChange = {
-            if (it.length <= 20) textChange(it)
+            if (it.length <= 50) textChange(it)
         },
-        modifier = Modifier
+        modifier = modifier
             .border(
                 width = 1.dp,
-                color = if (isLogin){ if(text.isEmpty())gray050 else Color.White} else{
-                    if(text.isEmpty()) gray050 else primaryColor
+                color = if (isLogin) {
+                    if (text.isNotEmpty()) gray050 else Color.White
+                } else {
+                    if (text.isEmpty()) gray050 else primaryColor
                 },
                 shape = RoundedCornerShape(size = 12.dp)
             )
             .fillMaxWidth()
-            .height(51.dp)
+            .wrapContentHeight()
             .background(
                 color = if (isLogin && text.isEmpty()) gray050 else Color.White,
                 shape = RoundedCornerShape(size = 12.dp)
@@ -170,7 +175,7 @@ fun RoundTextField(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(22.dp),
+                    .wrapContentHeight(),
                 contentAlignment = Alignment.CenterStart
             ) {
                 if (text.isEmpty()) {
@@ -312,10 +317,10 @@ fun AgeField(
             if (displayYear == 0 && displayMonth == 0 && displayDay == 0)
                 Text(
                     text = placeholder,
-                    fontSize = 16.sp,
+                    fontSize = 14.sp,
                     fontFamily = pretendard,
                     fontWeight = FontWeight.W400,
-                    color = gray500,
+                    color = gray600,
                 )
             else
                 Text(

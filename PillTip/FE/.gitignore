@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/app/src/main/res/raw/cert_ip.pem
+/app/src/main/res/raw/server.crt

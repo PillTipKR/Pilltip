@@ -19,16 +19,12 @@ fun HandleBackPressToExitApp(
     var lastBackPressTime by remember { mutableStateOf(0L) }
 
     BackHandler(enabled = true) {
-        if (navController.backQueue.size <= 2) {
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastBackPressTime < 2000) {
-                (context as? Activity)?.finish()
-            } else {
-                lastBackPressTime = currentTime
-                Toast.makeText(context, "한 번 더 누르면 앱이 종료돼요", Toast.LENGTH_SHORT).show()
-            }
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBackPressTime < 2000) {
+            (context as? Activity)?.finish()
         } else {
-            navController.popBackStack()
+            lastBackPressTime = currentTime
+            Toast.makeText(context, "한 번 더 누르면 앱이 종료돼요", Toast.LENGTH_SHORT).show()
         }
     }
 }

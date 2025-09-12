@@ -3,10 +3,8 @@ package com.pilltip.pilltip.view.auth
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.icu.text.ListFormatter.Width
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -25,16 +23,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -70,14 +64,14 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.pilltip.pilltip.R
 import com.pilltip.pilltip.composable.AppBar
@@ -134,13 +128,14 @@ fun SplashPage(navController: NavController) {
         visible = true
         delay(3000)
         navController.navigate("SelectPage") {
+            systemUiController.isNavigationBarVisible = true
             popUpTo("SplashPage") { inclusive = true }
         }
     }
 
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 1000) // 1초간 페이드 인
+        animationSpec = tween(durationMillis = 1000)
     )
 
     Column(
@@ -152,7 +147,7 @@ fun SplashPage(navController: NavController) {
     ) {
         Image(
             imageVector = ImageVector.vectorResource(R.drawable.logo_splash),
-            contentDescription = "PillTip_Logo",
+            contentDescription = "Pilltip_Logo",
             modifier = Modifier.alpha(alpha)
         )
     }
@@ -166,21 +161,48 @@ fun SelectPage(
 ) {
     HandleBackPressToExitApp(navController)
     val systemUiController = rememberSystemUiController()
-    val user by kakaoViewModel.user
     val context = LocalContext.current
-    val token = kakaoViewModel.getAccessToken()
     var termsOfService by remember { mutableStateOf(false) }
+
+    val user by kakaoViewModel.user
+    val token = kakaoViewModel.getAccessToken()
 
     LaunchedEffect(user) {
         if (user != null && token != null) {
-            signUpViewModel.updateLoginType(LoginType.SOCIAL)
-            signUpViewModel.updateToken(token)
-            signUpViewModel.updateProvider("kakao")
-            termsOfService = true
+            signUpViewModel.socialLogin(
+                token = token,
+                provider = "KAKAO",
+                onSuccess = { accessToken, refreshToken ->
+                    signUpViewModel.fetchMyInfo(accessToken) { userData ->
+                        TokenManager.saveTokens(context, accessToken, refreshToken)
+                        Log.d("Login", "로그인 성공! 액세스토큰: $accessToken")
+                        UserInfoManager.saveUserData(context, userData)
+                        Toast.makeText(context, "이미 가입하셨군요!\n${userData.nickname}님, 반가워요!", Toast.LENGTH_SHORT)
+                            .show()
+                        navController.navigate("PillMainPage") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                },
+                onFailure = { error ->
+                    Log.e("SocialLogin", "가입되어 있지 않은 회원입니다. 회원가입 진행합니다: ${error?.message}")
+                    kakaoViewModel.user.value?.let { user ->
+                        signUpViewModel.updateLoginType(LoginType.SOCIAL)
+                        signUpViewModel.updateToken(token ?: "")
+                        signUpViewModel.updateProvider("kakao")
+                        termsOfService = true
+                    }
+                }
+            )
         }
     }
 
+
     SideEffect {
+        systemUiController.setStatusBarColor(
+            color = Color.White,
+            darkIcons = true
+        )
         systemUiController.isNavigationBarVisible = true
     }
     Column(
@@ -239,7 +261,12 @@ fun SelectPage(
             borderColor = Color(0xFF408AF1),
             backgroundColor = Color.White,
             fontColor = primaryColor,
-            onClick = { navController.navigate("IDPage") }
+            onClick = {
+                navController.navigate("IDPage")
+                signUpViewModel.updateLoginType(LoginType.IDPW)
+                signUpViewModel.updateToken("")
+                signUpViewModel.updateProvider("")
+            }
         )
         HeightSpacer(14.dp)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -298,7 +325,8 @@ fun LoginPage(
                         TokenManager.saveTokens(context, accessToken, refreshToken)
                         Log.d("Login", "로그인 성공! 액세스토큰: $accessToken")
                         UserInfoManager.saveUserData(context, userData)
-                        Toast.makeText(context, "${userData.nickname}님, 반가워요!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "${userData.nickname}님, 반가워요!", Toast.LENGTH_SHORT)
+                            .show()
                         navController.navigate("PillMainPage") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -392,11 +420,12 @@ fun LoginPage(
                     textAlign = TextAlign.Center,
                 ),
                 modifier = Modifier.noRippleClickable {
-                    navController.navigate("FindMyInfoPage/FIND_ID") {
-                        popUpTo(
-                            "LoginPage"
-                        ) { inclusive = false }
-                    }
+                    Toast.makeText(context, "업데이트를 기대해주세요!", Toast.LENGTH_SHORT).show()
+//                    navController.navigate("FindMyInfoPage/FIND_ID") {
+//                        popUpTo(
+//                            "LoginPage"
+//                        ) { inclusive = false }
+//                    }
                 }
             )
             Image(
@@ -414,11 +443,12 @@ fun LoginPage(
                     textAlign = TextAlign.Center,
                 ),
                 modifier = Modifier.noRippleClickable {
-                    navController.navigate("FindMyInfoPage/FIND_PW") {
-                        popUpTo(
-                            "LoginPage"
-                        ) { inclusive = false }
-                    }
+                    Toast.makeText(context, "업데이트를 기대해주세요!", Toast.LENGTH_SHORT).show()
+//                    navController.navigate("FindMyInfoPage/FIND_PW") {
+//                        popUpTo(
+//                            "LoginPage"
+//                        ) { inclusive = false }
+//                    }
                 }
             )
             Image(
@@ -451,7 +481,11 @@ fun LoginPage(
                 .padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            HorizontalDivider(thickness = 1.5.dp, color = Color(0xFFE2E4EC), modifier = Modifier.weight(1f))
+            HorizontalDivider(
+                thickness = 1.5.dp,
+                color = Color(0xFFE2E4EC),
+                modifier = Modifier.weight(1f)
+            )
             Text(
                 text = "간편 로그인",
                 style = TextStyle(
@@ -462,7 +496,11 @@ fun LoginPage(
                 ),
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
-            HorizontalDivider(thickness = 1.5.dp, color = Color(0xFFE2E4EC), modifier = Modifier.weight(1f))
+            HorizontalDivider(
+                thickness = 1.5.dp,
+                color = Color(0xFFE2E4EC),
+                modifier = Modifier.weight(1f)
+            )
         }
         HeightSpacer(20.dp)
         Row(
@@ -473,7 +511,10 @@ fun LoginPage(
                 modifier = Modifier
                     .width(52.dp)
                     .height(52.dp)
-                    .background(color = Color(0xFFFDE500), shape = RoundedCornerShape(size = 100.dp)),
+                    .background(
+                        color = Color(0xFFFDE500),
+                        shape = RoundedCornerShape(size = 100.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -506,7 +547,11 @@ fun LoginPage(
                         viewModel.fetchMyInfo(accessToken) { userData ->
                             TokenManager.saveTokens(context, accessToken, refreshToken)
                             UserInfoManager.saveUserData(context, userData)
-                            Toast.makeText(context, "${userData.nickname}님, 반가워요!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "${userData.nickname}님, 반가워요!",
+                                Toast.LENGTH_SHORT
+                            ).show()
                             navController.navigate("PillMainPage") {
                                 popUpTo(0) { inclusive = true }
                             }
@@ -723,6 +768,7 @@ fun IdPage(
     navController: NavController,
     viewModel: SignUpViewModel
 ) {
+    val context = LocalContext.current
     var ID by remember { mutableStateOf("") }
     var isChecked by remember { mutableStateOf(false) }
 
@@ -741,7 +787,7 @@ fun IdPage(
     val isLengthValid = ID.length >= 8 && ID.length <= 20
     val isSpecialCharValid = !containsSpeical && ID.isNotEmpty()
     val isAllConditionsValid = isEnglishAndNumberValid && isLengthValid && isSpecialCharValid
-
+    var isDuplicate by remember { mutableStateOf<Boolean?>(null) }
     val focusRequester = FocusRequester()
     var isFocused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
@@ -770,7 +816,14 @@ fun IdPage(
                 value = ID,
                 cursorBrush = SolidColor(if (isFocused) Color(0xFF397CDB) else Color(0xFFBFBFBF)),
                 onValueChange = {
-                    ID = it
+                    val filtered = it.filter { ch -> ch.isLetterOrDigit() }
+                    if (filtered != it) {
+                        ID = filtered
+                    } else {
+                        ID = it
+                    }
+                    isDuplicate = true
+                    isChecked = false
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
@@ -861,8 +914,20 @@ fun IdPage(
             buttonColor = if (isAllConditionsValid) Color(0xFF348ADF) else Color(0xFFCADCF5),
             onClick = {
                 viewModel.updateloginId(ID)
-                if (isChecked && isAllConditionsValid) navController.navigate("PasswordPage")
-                isChecked = true
+                if (!isChecked) {
+                    viewModel.checkLoginIdDuplicate(ID) { isSuccess, isAvailable ->
+                        isDuplicate = isAvailable?.not()
+                        if (isSuccess && isDuplicate == true) {
+                            Toast.makeText(context, "이미 사용 중인 아이디입니다.", Toast.LENGTH_SHORT).show()
+                        } else if (!isSuccess) {
+                            Toast.makeText(context, "중복 확인 중 오류가 발생했어요.", Toast.LENGTH_SHORT).show()
+                        }
+                        if (isSuccess && isDuplicate == false) isChecked = true
+                    }
+                } else if (isChecked && !isDuplicate!! && isAllConditionsValid) {
+                    // 중복 확인 완료 + 사용 가능 + 유효성 검증 완료
+                    navController.navigate("PasswordPage")
+                }
             }
         )
     }
@@ -895,7 +960,8 @@ fun PasswordPage(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val isAllConditionsValid = isEnglishAndNumberValid && isLengthValid && isSequentialNumbersValid
-
+    var isVisible1 by remember { mutableStateOf(true) }
+    var isVisible2 by remember { mutableStateOf(true) }
     var termsOfService by remember { mutableStateOf(false) }
 
     Column(
@@ -920,12 +986,18 @@ fun PasswordPage(
             BasicTextField(
                 value = password,
                 onValueChange = {
-                    password = it
+                    val filtered = it.filter { ch -> ch.isLetterOrDigit() }
+                    if (filtered != it) {
+                        password = filtered
+                    } else {
+                        password = it
+                    }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
                     onDone = { keyboardController?.hide() }
                 ),
+                visualTransformation = if (isVisible1 == true) PasswordVisualTransformation() else VisualTransformation.None,
                 modifier = Modifier
                     .height(22.dp)
                     .weight(1f)
@@ -953,6 +1025,20 @@ fun PasswordPage(
                                     color = Color(0x99818181)
                                 )
                             )
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Image(
+                                    imageVector = ImageVector.vectorResource(R.drawable.btn_login_visiblility),
+                                    contentDescription = "비밀번호 확인",
+                                    modifier = Modifier.noRippleClickable {
+                                        isVisible1 = !isVisible1
+                                    }
+                                )
+                            }
                         }
                         innerTextField()
                     }
@@ -987,8 +1073,14 @@ fun PasswordPage(
             BasicTextField(
                 value = reenteredPassword,
                 onValueChange = {
-                    reenteredPassword = it
+                    val filtered = it.filter { ch -> ch.isLetterOrDigit() }
+                    if (filtered != it) {
+                        reenteredPassword = filtered
+                    } else {
+                        reenteredPassword = it
+                    }
                 },
+                visualTransformation = if (isVisible2 == true) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
                     onDone = { keyboardController?.hide() }
@@ -1020,6 +1112,20 @@ fun PasswordPage(
                                     color = Color(0x99818181)
                                 )
                             )
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Image(
+                                    imageVector = ImageVector.vectorResource(R.drawable.btn_login_visiblility),
+                                    contentDescription = "비밀번호 확인",
+                                    modifier = Modifier.noRippleClickable {
+                                        isVisible2 = !isVisible2
+                                    }
+                                )
+                            }
                         }
                         innerTextField()
                     }
@@ -1075,8 +1181,8 @@ fun PasswordPage(
             mModifier = buttonModifier,
             text = "다음",
             buttonColor =
-            if (isAllConditionsValid && password == reenteredPassword) Color(0xFF348ADF)
-            else Color(0xFFCADCF5),
+                if (isAllConditionsValid && password == reenteredPassword) Color(0xFF348ADF)
+                else Color(0xFFCADCF5),
             onClick = {
                 if (isAllConditionsValid && password == reenteredPassword) {
                     viewModel.updatePassword(password)
@@ -1117,7 +1223,8 @@ fun PhoneAuthPage(
         val sec = timeRemaining % 60
         String.format("%02d:%02d", min, sec)
     }
-
+    var isDuplicate by remember { mutableStateOf<Boolean?>(null) }
+    var isChecked by remember { mutableStateOf(false) }
     var isFocused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
@@ -1125,7 +1232,21 @@ fun PhoneAuthPage(
     val localWitdh = LocalConfiguration.current.screenWidthDp
 
     val isAutoVerified by phoneViewModel.isAutoVerified.collectAsState()
+    val isPhoneValid = phoneNumber.length >= 11
+    val isReadyToVerify = isChecked && verificationId == null && isPhoneValid
+    val isCodeEntered = verificationId != null && code.length == 6
 
+    val buttonText = when {
+        !isChecked -> "중복 확인"
+        isReadyToVerify -> "인증 요청"
+        isCodeEntered -> "인증하기"
+        else -> "다음"
+    }
+
+    LaunchedEffect(phoneNumber) {
+        isChecked = false
+        isDuplicate = null
+    }
 
     LaunchedEffect(isAutoVerified) {
         if (isAutoVerified) {
@@ -1206,31 +1327,40 @@ fun PhoneAuthPage(
                 (verificationId == null && phoneNumber.length >= 11) ||
                 (verificationId != null && code.length == 6)
             ) Color(0xFF397CDB) else Color(0xFFCADCF5),
-            text = if (
-                (verificationId != null && code.length == 6)
-            ) "인증하기" else "다음",
+            text = buttonText,
             onClick = {
-                if (
-                    (verificationId == null && phoneNumber.length >= 11) ||
-                    (verificationId != null && code.length == 6)
-                ) {
-                    activity?.let {
-                        if (verificationId == null) {
-                            phoneViewModel.requestVerification(
-                                activity = it,
-                                onSent = {},
-                                onFailed = {}
-                            )
-                        } else {
-                            phoneViewModel.verifyCodeInput(
-                                onSuccess = {
-                                    viewModel.updatePhone(phoneNumber)
-                                    navController.navigate("ProfilePage")
-                                },
-                                onFailure = {}
-                            )
+                if (!isChecked) {
+                    viewModel.checkPhoneNumberDuplicate(phoneViewModel.toString()) { isSuccess, isAvailable ->
+                        isDuplicate = isAvailable?.not()
+                        if (isSuccess && isDuplicate == true) {
+                            Toast.makeText(context, "이미 사용 중인 번호예요.", Toast.LENGTH_SHORT).show()
+                        } else if (!isSuccess) {
+                            Toast.makeText(context, "중복 확인 중 오류가 발생했어요.", Toast.LENGTH_SHORT).show()
+                        } else if (isDuplicate == false) {
+                            isChecked = true
+                            Toast.makeText(context, "사용 가능한 번호예요.", Toast.LENGTH_SHORT).show()
                         }
                     }
+                } else if (isChecked && verificationId == null) {
+                    activity?.let {
+                        phoneViewModel.requestVerification(
+                            activity = it,
+                            onSent = {},
+                            onFailed = {
+                                Toast.makeText(context, "인증 요청 실패", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                } else if (isCodeEntered) {
+                    phoneViewModel.verifyCodeInput(
+                        onSuccess = {
+                            viewModel.updatePhone(phoneNumber)
+                            navController.navigate("ProfilePage")
+                        },
+                        onFailure = {
+                            Toast.makeText(context, "인증 실패", Toast.LENGTH_SHORT).show()
+                        }
+                    )
                 }
             }
         )
@@ -1271,10 +1401,10 @@ fun ProfilePage(
         ProfileStepDescription("닉네임")
         HeightSpacer(12.dp)
         RoundTextField(
-            nickname,
+            text = nickname,
             textChange = { nickname = it },
-            "닉네임을 입력해주세요",
-            false
+            placeholder = "닉네임을 입력해주세요",
+            isLogin = false
         )
         HeightSpacer(28.dp)
         ProfileStepDescription("성별")
@@ -1284,11 +1414,15 @@ fun ProfilePage(
         ProfileStepDescription("연령")
         HeightSpacer(12.dp)
         AgeField(
-         ageChange = { selectedYear, selectedMonth, selectedDay ->
-            year = selectedYear
-            month = selectedMonth
-            day = selectedDay
-        })
+            ageChange = { selectedYear, selectedMonth, selectedDay ->
+                year = selectedYear
+                month = selectedMonth
+                day = selectedDay
+            },
+            displayYear = year,
+            displayMonth = month,
+            displayDay = day,
+        )
         HeightSpacer(28.dp)
         Row {
             ProfileStepDescription("연령")
@@ -1347,7 +1481,14 @@ fun InterestPage(
     viewModel: SignUpViewModel
 ) {
     val selectedKeywords = remember { mutableStateListOf<String>() }
-    val allKeywords = List(20) { index -> "키워드~${index + 1}" }
+    val allKeywords = listOf(
+        "복약", "운동", "수면", "스트레스", "면역력",
+        "복약관리", "만성질환", "피부질환", "소화",
+        "체중감량", "알러지", "금연", "문진표",
+        "정신건강", "백신", "약물부작용", "가족건강",
+        "개인정보", "보안"
+    )
+
     val context = LocalContext.current
 
     Column(
@@ -1410,7 +1551,18 @@ fun InterestPage(
                             viewModel.submitTerms(
                                 token = accessToken,
                                 onSuccess = {
-                                    navController.navigate("PillMainPage")
+                                    viewModel.fetchMyInfo(accessToken) { userData ->
+                                        TokenManager.saveTokens(context, accessToken, refreshToken)
+                                        UserInfoManager.saveUserData(context, userData)
+                                        Toast.makeText(
+                                            context,
+                                            "${userData.nickname}님, 필팁에 오신 걸 환영해요!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        navController.navigate("PillMainPage") {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    }
                                 },
                                 onFailure = { error ->
                                     Toast.makeText(
@@ -1418,7 +1570,7 @@ fun InterestPage(
                                         "약관 전송 실패: ${error?.message ?: "알 수 없는 오류"}",
                                         Toast.LENGTH_SHORT
                                     ).show()
-                                    navController.navigate("PillMainPage")  {
+                                    navController.navigate("SelectPage") {
                                         popUpTo(0) { inclusive = true }
                                     }
                                 }
@@ -1427,10 +1579,10 @@ fun InterestPage(
                         onFailure = { error ->
                             Toast.makeText(
                                 context,
-                                error?.message ?: "회원가입에 실패했습니다.",
+                                error?.message ?: "회원가입에 실패했습니다. 다시 시도해주세요.",
                                 Toast.LENGTH_SHORT
                             ).show()
-                            navController.navigate("PillMainPage")  {
+                            navController.navigate("SelectPage") {
                                 popUpTo(0) { inclusive = true }
                             }
                         }

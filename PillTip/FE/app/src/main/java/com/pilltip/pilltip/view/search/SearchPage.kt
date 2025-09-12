@@ -1,18 +1,24 @@
 package com.pilltip.pilltip.view.search
 
-import android.content.Intent
-import android.graphics.drawable.Icon
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +32,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,27 +46,22 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults.SecondaryIndicator
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,14 +71,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -88,9 +96,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.pilltip.pilltip.R
+import com.pilltip.pilltip.composable.BackButton
 import com.pilltip.pilltip.composable.HeightSpacer
 import com.pilltip.pilltip.composable.NextButton
 import com.pilltip.pilltip.composable.SearchComposable.AutoCompleteList
@@ -100,22 +111,28 @@ import com.pilltip.pilltip.composable.SearchComposable.ExpandableInfoBox
 import com.pilltip.pilltip.composable.SearchComposable.ExportAndCopy
 import com.pilltip.pilltip.composable.SearchComposable.PillSearchField
 import com.pilltip.pilltip.composable.SearchComposable.SearchTag
+import com.pilltip.pilltip.composable.SearchComposable.ZoomableImageDialog
 import com.pilltip.pilltip.composable.SearchComposable.shareText
 import com.pilltip.pilltip.composable.WidthSpacer
 import com.pilltip.pilltip.composable.noRippleClickable
+import com.pilltip.pilltip.model.RecognizeSpeech
 import com.pilltip.pilltip.model.UserInfoManager
 import com.pilltip.pilltip.model.search.DetailDrugData
 import com.pilltip.pilltip.model.search.LogViewModel
+import com.pilltip.pilltip.model.search.ReviewViewModel
 import com.pilltip.pilltip.model.search.SearchHiltViewModel
 import com.pilltip.pilltip.ui.theme.gray050
 import com.pilltip.pilltip.ui.theme.gray100
 import com.pilltip.pilltip.ui.theme.gray200
+import com.pilltip.pilltip.ui.theme.gray300
 import com.pilltip.pilltip.ui.theme.gray400
 import com.pilltip.pilltip.ui.theme.gray500
+import com.pilltip.pilltip.ui.theme.gray600
 import com.pilltip.pilltip.ui.theme.gray700
 import com.pilltip.pilltip.ui.theme.gray800
 import com.pilltip.pilltip.ui.theme.pretendard
 import com.pilltip.pilltip.ui.theme.primaryColor
+import com.pilltip.pilltip.view.search.Logic.removeMarkdown
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -134,6 +151,14 @@ fun SearchPage(
     val recentSearches by logViewModel.recentSearches.collectAsState()
     val autoCompleted by searchViewModel.autoCompleted.collectAsState()
     val isLoading by searchViewModel.isAutoCompleteLoading.collectAsState()
+    BackHandler {
+        navController.navigate("PillMainPage") {
+            popUpTo("PillMainPage") {
+                inclusive = true
+            }
+            launchSingleTop = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         snapshotFlow { inputText }
@@ -149,6 +174,10 @@ fun SearchPage(
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
+        systemUiController.setStatusBarColor(
+            color = Color.White,
+            darkIcons = true
+        )
         systemUiController.isNavigationBarVisible = true
     }
 
@@ -173,25 +202,34 @@ fun SearchPage(
         )
         HeightSpacer(28.dp)
         if (inputText.isEmpty()) {
-            Text(
-                text = "인기 검색어",
-                style = TextStyle(
-                    fontSize = 14.sp,
-                    fontFamily = pretendard,
-                    fontWeight = FontWeight(600),
-                    color = gray700,
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "최근 검색어",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontFamily = pretendard,
+                        fontWeight = FontWeight(600),
+                        color = gray700,
+                    )
                 )
-            )
-            HeightSpacer(26.dp)
-            Text(
-                text = "최근 검색어",
-                style = TextStyle(
-                    fontSize = 14.sp,
-                    fontFamily = pretendard,
-                    fontWeight = FontWeight(600),
-                    color = gray700,
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "전체 삭제",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontFamily = pretendard,
+                        fontWeight = FontWeight(500),
+                        color = gray600,
+                        textDecoration = TextDecoration.Underline,
+                    ),
+                    modifier = Modifier.noRippleClickable {
+                        logViewModel.clearSearchQueries()
+                    }
                 )
-            )
+            }
+
             HeightSpacer(18.dp)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -338,7 +376,15 @@ fun SearchResultsPage(
                     searchBoxSize = coordinates.size
                 }
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp),
+                .padding(horizontal = 22.dp)
+                .noRippleClickable {
+                    navController.navigate("SearchPage") {
+                        popUpTo("SearchPage") {
+                            inclusive = false
+                        }
+                        launchSingleTop = true
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
             PillSearchField(
@@ -384,7 +430,7 @@ fun SearchResultsPage(
                                 Text(
                                     text = result.value,
                                     modifier = Modifier
-                                        .clickable {
+                                        .noRippleClickable {
                                             inputText = result.value
                                             hasUserTyped = false
                                             searchViewModel.fetchDrugSearch(result.value)
@@ -419,11 +465,8 @@ fun SearchResultsPage(
                     }
                 }
             }
-
         }
-
         HeightSpacer(16.dp)
-
         when {
             isLoading -> {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -462,20 +505,24 @@ fun SearchResultsPage(
 fun DetailPage(
     navController: NavController,
     searchViewModel: SearchHiltViewModel,
+    reviewViewModel: ReviewViewModel
 ) {
     val tabs = listOf("약품정보", "보관방법", "리뷰")
     val pagerState = rememberPagerState(initialPage = 0) {
         tabs.size
     }
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
     val detailState by searchViewModel.drugDetail.collectAsState()
     val nickname = UserInfoManager.getUserData(LocalContext.current)?.nickname
     val systemUiController = rememberSystemUiController()
+    var isImageViewerOpen by remember { mutableStateOf(false) }
     SideEffect {
         systemUiController.isNavigationBarVisible = true
     }
-
+    BackHandler {
+        navController.popBackStack()
+    }
     when (val detail = detailState) {
         null -> {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -484,103 +531,131 @@ fun DetailPage(
         }
 
         else -> {
+            val hasWarning = detail.durTags.any { it.isTrue }
             Box(modifier = Modifier.fillMaxSize()) {
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.White)
-                        .verticalScroll(rememberScrollState())
                         .padding(WindowInsets.statusBars.asPaddingValues())
                         .padding(bottom = 91.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 22.dp, vertical = 16.dp)
-                    ) {
-                        Image(
-                            imageVector = ImageVector.vectorResource(R.drawable.btn_details_left_arrow),
-                            contentDescription = "뒤로가기 버튼",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .noRippleClickable { navController.popBackStack() }
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Image(
-                            imageVector = ImageVector.vectorResource(R.drawable.btn_details_share),
-                            contentDescription = "공유 버튼",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .noRippleClickable { }
-                        )
-                        WidthSpacer(16.dp)
-                        Image(
-                            imageVector = ImageVector.vectorResource(R.drawable.btn_details_save),
-                            contentDescription = "찜하기 버튼",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .noRippleClickable { }
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(260.dp)
-                            .background(gray050),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            imageVector = ImageVector.vectorResource(R.drawable.logo_pilltip_typo),
-                            contentDescription = "기본 이미지",
-                        )
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 22.dp, vertical = 20.dp),
-                    ) {
-                        if (detail.tag == "COMMON") {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Image(
-                                    imageVector = ImageVector.vectorResource(R.drawable.ic_details_blue_common_pills),
-                                    contentDescription = "일반의약품",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                WidthSpacer(6.dp)
-                                Text(
-                                    text = "일반의약품",
-                                    fontSize = 12.sp,
-                                    fontFamily = pretendard,
-                                    fontWeight = FontWeight(500),
-                                    color = primaryColor,
-                                )
-                            }
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Image(
-                                    imageVector = ImageVector.vectorResource(R.drawable.ic_details_red_expert_pills),
-                                    contentDescription = "전문의약품",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                WidthSpacer(6.dp)
-                                Text(
-                                    text = "전문의약품",
-                                    fontSize = 12.sp,
-                                    fontFamily = pretendard,
-                                    fontWeight = FontWeight(500),
-                                    color = Color(0xFFEF524F),
-                                )
-                            }
-
-                        }
-                        HeightSpacer(8.dp)
+                    item {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 22.dp, vertical = 16.dp)
                         ) {
+                            Image(
+                                imageVector = ImageVector.vectorResource(R.drawable.btn_details_left_arrow),
+                                contentDescription = "뒤로가기 버튼",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .noRippleClickable { navController.popBackStack() }
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Image(
+                                imageVector = ImageVector.vectorResource(R.drawable.btn_details_share),
+                                contentDescription = "공유 버튼",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .noRippleClickable { }
+                            )
+                            WidthSpacer(16.dp)
+                            Image(
+                                imageVector = ImageVector.vectorResource(R.drawable.btn_details_save),
+                                contentDescription = "찜하기 버튼",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .noRippleClickable { }
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(230.dp)
+                                .background(gray050),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!detail.imageUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = detail.imageUrl,
+                                    contentDescription = "약 이미지",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .noRippleClickable {
+                                            isImageViewerOpen = true
+                                        }
+                                )
+                                if (isImageViewerOpen) {
+                                    ZoomableImageDialog(
+                                        imageUrl = detail.imageUrl,
+                                        onDismiss = { isImageViewerOpen = false }
+                                    )
+                                }
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Image(
+                                        imageVector = ImageVector.vectorResource(R.drawable.ic_default_pill),
+                                        contentDescription = "기본 이미지"
+                                    )
+                                    WidthSpacer(30.dp)
+                                    Image(
+                                        imageVector = ImageVector.vectorResource(R.drawable.ic_default_pill),
+                                        contentDescription = "기본 이미지"
+                                    )
+                                }
+
+                            }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 22.dp, vertical = 20.dp),
+                        ) {
+                            if (detail.tag == "COMMON") {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Image(
+                                        imageVector = ImageVector.vectorResource(R.drawable.ic_details_blue_common_pills),
+                                        contentDescription = "일반의약품",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    WidthSpacer(6.dp)
+                                    Text(
+                                        text = "일반의약품",
+                                        fontSize = 12.sp,
+                                        fontFamily = pretendard,
+                                        fontWeight = FontWeight(500),
+                                        color = primaryColor,
+                                    )
+                                }
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Image(
+                                        imageVector = ImageVector.vectorResource(R.drawable.ic_details_red_expert_pills),
+                                        contentDescription = "전문의약품",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    WidthSpacer(6.dp)
+                                    Text(
+                                        text = "전문의약품",
+                                        fontSize = 12.sp,
+                                        fontFamily = pretendard,
+                                        fontWeight = FontWeight(500),
+                                        color = Color(0xFFEF524F),
+                                    )
+                                }
+
+                            }
+                            HeightSpacer(8.dp)
                             Text(
                                 text = detail.name,
                                 style = TextStyle(
@@ -590,108 +665,132 @@ fun DetailPage(
                                     color = Color(0xFF000000)
                                 )
                             )
-                            WidthSpacer(4.dp)
-                            Box(
-                                modifier = Modifier
-                                    .padding(1.dp)
-                                    .width(2.dp)
-                                    .height(2.dp)
-                                    .background(color = gray500)
-                            )
-                            WidthSpacer(4.dp)
+                            HeightSpacer(6.dp)
                             Text(
                                 text = detail.manufacturer,
                                 style = TextStyle(
                                     fontSize = 12.sp,
                                     fontFamily = pretendard,
                                     fontWeight = FontWeight(500),
-                                    color = Color(0xFF000000)
+                                    color = gray500
                                 )
                             )
-                        }
-                        HeightSpacer(14.dp)
-                        HorizontalDivider(thickness = 0.5.dp, color = gray200)
-                        HeightSpacer(14.dp)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Image(
-                                imageVector = ImageVector.vectorResource(R.drawable.ic_search_dur_alert),
-                                contentDescription = "DUR 알림",
-                                modifier = Modifier.size(20.dp)
-                            )
-                            WidthSpacer(8.dp)
-                            Text(
-                                text = "$nickname 님은 섭취에 주의가 필요한 약품이에요!",
-                                style = TextStyle(
-                                    fontSize = 12.sp,
-                                    fontFamily = pretendard,
-                                    fontWeight = FontWeight(500),
-                                    color = gray800,
+                            HeightSpacer(16.dp)
+                            HorizontalDivider(thickness = 0.5.dp, color = gray200)
+                            HeightSpacer(16.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Image(
+                                    imageVector = ImageVector.vectorResource(
+                                        if (hasWarning) R.drawable.ic_search_dur_alert
+                                        else R.drawable.ic_search_dur_ok
+                                    ),
+                                    contentDescription = "DUR 알림",
+                                    modifier = Modifier.size(20.dp)
                                 )
-                            )
-                        }
-//                    Text(text = "제형: ${detail.form}")
-//                    Text(text = "포장단위: ${detail.packaging}")
-//                    Text(text = "ATC 코드: ${detail.atcCode}")
-//                    Text(text = "승인일: ${detail.approvalDate}")
-                    }
-
-                    HeightSpacer(16.dp)
-                    TabRow(
-                        selectedTabIndex = pagerState.currentPage,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.White),
-                        contentColor = primaryColor
-                    ) {
-                        tabs.forEachIndexed { index, title ->
-                            Tab(
-                                modifier = Modifier.weight(1f),
-                                selected = pagerState.currentPage == index,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(index)
-                                    }
-                                },
-                                selectedContentColor = primaryColor,
-                                unselectedContentColor = gray500,
-                                text = {
-                                    Text(
-                                        text = title,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight(600),
-                                        fontFamily = pretendard
+                                WidthSpacer(6.dp)
+                                Text(
+                                    text = if (hasWarning) "$nickname 님은 섭취에 주의가 필요한 약품이에요!"
+                                    else "$nickname 님! 안심하고 복약하셔도 괜찮아요",
+                                    style = TextStyle(
+                                        fontSize = 12.sp,
+                                        fontFamily = pretendard,
+                                        fontWeight = FontWeight(500),
+                                        color = gray800,
                                     )
+                                )
+                            }
+                            HeightSpacer(14.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                detail.durTags.forEach { tag ->
+                                    Box(
+                                        modifier = Modifier
+                                            .height(24.dp)
+                                            .background(
+                                                color = if (tag.isTrue) primaryColor else gray100,
+                                                shape = RoundedCornerShape(size = 601.70361.dp)
+                                            )
+                                            .padding(
+                                                start = 10.dp,
+                                                top = 6.dp,
+                                                end = 10.dp,
+                                                bottom = 6.dp
+                                            )
+                                    ) {
+                                        Text(
+                                            text = tag.title,
+                                            style = TextStyle(
+                                                fontSize = 10.sp,
+                                                fontFamily = pretendard,
+                                                fontWeight = FontWeight(500),
+                                                color = if (tag.isTrue) Color.White else gray500,
+                                            )
+                                        )
+                                    }
                                 }
-                            )
+
+                            }
+                        }
+                        HorizontalDivider(thickness = 10.dp, color = gray100)
+                        TabRow(
+                            selectedTabIndex = pagerState.currentPage,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White),
+                            indicator = { tabPositions ->
+                                SecondaryIndicator(
+                                    Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
+                                    color = gray800
+                                )
+                            }
+                        ) {
+                            tabs.forEachIndexed { index, title ->
+                                Tab(
+                                    modifier = Modifier
+                                        .background(Color.White),
+                                    selected = pagerState.currentPage == index,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(index)
+                                        }
+                                    },
+                                    selectedContentColor = gray800,
+                                    unselectedContentColor = gray300,
+                                    text = {
+                                        Text(
+                                            text = title,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight(600),
+                                            fontFamily = pretendard
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentHeight()
+                        ) { page ->
+                            when (page) {
+                                0 -> DrugInfoTab(navController, detail, searchViewModel)
+                                1 -> StorageInfoTab(navController, detail)
+                                2 -> ReviewTab(
+                                    navController,
+                                    detail,
+                                    searchViewModel,
+                                    reviewViewModel
+                                )
+                            }
                         }
                     }
 
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxWidth().wrapContentHeight()
-                    ) { page ->
-                        when (page) {
-                            0 -> DrugInfoTab(navController, detail)
-                            1 -> StorageInfoTab(navController, detail)
-                            2 -> ReviewTab(navController, detail)
-                        }
-                    }
-
-
-//
-//                HeightSpacer(16.dp)
-//
-//                Text("DUR 정보:")
-//                detail.durTags.forEach { tag ->
-//                    if (tag.isTrue) {
-//                        Text("● ${tag.title}")
-//                        tag.description.forEach {
-//                            Text("- ${it.name}: ${it.reason} (${it.note})")
-//                        }
-//                    }
-//                }
                 }
                 Column(
                     modifier = Modifier
@@ -713,7 +812,7 @@ fun DetailPage(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "12명이 해당 약품을 복약 중이에요",
+                            text = "${detail.count}명이 해당 약품을 복약했어요",
                             style = TextStyle(
                                 fontSize = 12.sp,
                                 fontFamily = pretendard,
@@ -724,7 +823,7 @@ fun DetailPage(
                     }
                     HorizontalDivider(
                         modifier = Modifier.fillMaxWidth(),
-                        thickness = 2.dp,
+                        thickness = 1.dp,
                         color = gray200
                     )
                     Row(
@@ -733,18 +832,35 @@ fun DetailPage(
                             .background(Color.White),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+
                         NextButton(
                             mModifier = Modifier
                                 .weight(1f)
                                 .padding(vertical = 16.dp)
                                 .padding(start = 22.dp, bottom = 46.dp, end = 5.dp)
                                 .height(58.dp)
-                                .border(1.dp, primaryColor, shape = RoundedCornerShape(size = 16.dp)),
+                                .border(
+                                    1.dp,
+                                    primaryColor,
+                                    shape = RoundedCornerShape(size = 12.dp)
+                                ),
                             text = "복약정보 저장",
+                            shape = 12,
                             buttonColor = Color.White,
                             textColor = primaryColor,
                             onClick = {
-                                navController.navigate("DosagePage/${detail.id}/${Uri.encode(detail.name)}")
+                                if (detail.isTaking == true) Toast.makeText(
+                                    context,
+                                    "이미 복약 중이에요!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                else navController.navigate(
+                                    "DosagePage/${detail.id}/${
+                                        Uri.encode(
+                                            detail.name
+                                        )
+                                    }"
+                                )
                             }
                         )
                         NextButton(
@@ -754,10 +870,11 @@ fun DetailPage(
                                 .padding(start = 5.dp, bottom = 46.dp, end = 22.dp)
                                 .height(58.dp),
                             text = "리뷰 쓰기",
+                            shape = 12,
                             buttonColor = primaryColor,
                             textColor = Color.White,
                             onClick = {
-
+                                navController.navigate("ReviewWritePage/${detail.id}")
                             }
                         )
                     }
@@ -770,18 +887,32 @@ fun DetailPage(
 @Composable
 fun DrugInfoTab(
     navController: NavController,
-    detail: DetailDrugData
+    detail: DetailDrugData,
+    viewModel: SearchHiltViewModel
 ) {
     val context = LocalContext.current
     val nickname = UserInfoManager.getUserData(context)?.nickname
     val clipboardManager = LocalClipboardManager.current
+    val permission = UserInfoManager.getUserData(LocalContext.current)?.permissions
+    val gptAdvice by viewModel.gptAdvice.collectAsState()
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    val showScrollToTop by remember {
+        derivedStateOf { scrollState.value > 300 }
+    }
 
+    if (permission == true && gptAdvice == null) {
+        LaunchedEffect(detail.id) {
+            viewModel.fetchGptAdvice(detail)
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .heightIn(min = 300.dp)
             .padding(horizontal = 22.dp, vertical = 30.dp)
     ) {
+        HeightSpacer(12.dp)
         Text(
             text = "${nickname}님 AI 맞춤 안내",
             style = TextStyle(
@@ -802,36 +933,103 @@ fun DrugInfoTab(
             )
         )
         HeightSpacer(12.dp)
-        DashedBorderBox(
-            onRegisterClick = {
-                navController.navigate("QuestionnairePage")
-            }
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.End
-        ){
-            Text(
-                text = "도움이 되었나요?",
-                style = TextStyle(
-                    fontSize = 10.sp,
-                    fontFamily = pretendard,
-                    fontWeight = FontWeight(500),
-                    color = gray400,
-                    textDecoration = TextDecoration.Underline,
+        if (permission == true) {
+            if (gptAdvice != null) {
+                ExpandableInfoBox(
+                    item = gptAdvice!!,
+                    collapsedHeight = 186.dp
+                ) { gpt ->
+                    Text(
+                        text = removeMarkdown(gpt),
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontFamily = pretendard,
+                            lineHeight = 23.4.sp,
+                            fontWeight = FontWeight(500),
+                            color = gray800,
+                        )
+                    )
+                }
+            } else {
+                val transition = rememberInfiniteTransition()
+                val translateAnimation by transition.animateFloat(
+                    initialValue = 360f,
+                    targetValue = 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(
+                            durationMillis = 1200,
+                            easing = FastOutSlowInEasing
+                        ),
+                        repeatMode = RepeatMode.Restart
+                    )
                 )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    HeightSpacer(20.dp)
+                    Canvas(modifier = Modifier.size(size = 30.dp)) {
+                        val startAngle = 5f
+                        val sweepAngle = 350f
+
+                        rotate(translateAnimation) {
+                            drawArc(
+                                brush = Brush.sweepGradient(
+                                    colors = listOf(
+                                        primaryColor,
+                                        primaryColor.copy(0f)
+                                    ),
+                                    center = Offset(size.width / 2f, size.height / 2f)
+                                ),
+                                startAngle = startAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                topLeft = Offset(6 / 2f, 6 / 2f),
+                                style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round),
+                            )
+                        }
+                    }
+                    HeightSpacer(20.dp)
+                    Text(
+                        text = "${nickname}님을 위한 맞춤 정보를 AI가 분석 중이에요",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontFamily = pretendard,
+                            fontWeight = FontWeight(700),
+                            color = gray800,
+                            textAlign = TextAlign.Center,
+                        )
+                    )
+                    HeightSpacer(8.dp)
+                    Text(
+                        text = "잠시만 기다려주세요",
+                        style = TextStyle(
+                            fontSize = 12.sp,
+                            lineHeight = 19.6.sp,
+                            fontFamily = pretendard,
+                            fontWeight = FontWeight(600),
+                            color = gray400,
+                        )
+                    )
+                }
+            }
+        } else {
+            DashedBorderBox(
+                onRegisterClick = {
+                    navController.navigate("EssentialPage")
+                }
             )
         }
-        HeightSpacer(42.dp)
+        HeightSpacer(32.dp)
         ExportAndCopy(
             headerText = "효능/효과",
             onCopyClicked = {
-                val text = detail.effect.let { "[${it.Type}] ${it.effect}" }
+                val text = removeMarkdown(detail.effect.effect)
                 clipboardManager.setText(AnnotatedString(text))
                 Toast.makeText(context, "복사되었습니다", Toast.LENGTH_SHORT).show()
             },
             onExportClicked = {
-                val text = detail.effect.let { "[${it.Type}] ${it.effect}" }
+                val text = removeMarkdown(detail.effect.effect)
                 shareText(context, "효능/효과", text)
             }
         )
@@ -839,21 +1037,30 @@ fun DrugInfoTab(
             item = detail.effect,
             collapsedHeight = 186.dp
         ) { effect ->
-            Text("[${effect.Type}] ${effect.effect}")
+            Text(
+                text = removeMarkdown(effect.effect),
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    fontFamily = pretendard,
+                    lineHeight = 23.4.sp,
+                    fontWeight = FontWeight(500),
+                    color = gray800,
+                )
+            )
         }
-        HeightSpacer(42.dp)
+        HeightSpacer(32.dp)
         ExportAndCopy(
             headerText = "상세성분",
             onCopyClicked = {
                 val text = detail.ingredients.joinToString("\n") {
-                    "- ${it.name} (${it.dose}) ${if (it.main) "[주성분]" else ""}"
+                    "- ${it.name} (${it.dose}${if (it.isMain) ", 주성분" else ""})"
                 }
                 clipboardManager.setText(AnnotatedString(text))
                 Toast.makeText(context, "복사되었습니다", Toast.LENGTH_SHORT).show()
             },
             onExportClicked = {
                 val text = detail.ingredients.joinToString("\n") {
-                    "- ${it.name} (${it.dose}) ${if (it.main) "[주성분]" else ""}"
+                    "- ${it.name} (${it.dose}) ${if (it.isMain) "[주성분]" else ""}"
                 }
                 shareText(context, "상세성분", text)
             }
@@ -861,18 +1068,27 @@ fun DrugInfoTab(
         ExpandableInfoBox(
             items = detail.ingredients
         ) { ingredient ->
-            Text("- ${ingredient.name} (${ingredient.dose}) ${if (ingredient.main) "[주성분]" else ""}")
+            Text(
+                text = "${if (ingredient.isMain) "[주성분]" else "⸰ "} ${ingredient.name} (${ingredient.dose})",
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    fontFamily = pretendard,
+                    lineHeight = 23.4.sp,
+                    fontWeight = FontWeight(500),
+                    color = gray800,
+                )
+            )
         }
-        HeightSpacer(42.dp)
+        HeightSpacer(32.dp)
         ExportAndCopy(
             headerText = "용량/용법",
             onCopyClicked = {
-                val text = "[${detail.usage.Type}] ${detail.usage.effect}"
+                val text = removeMarkdown(detail.usage.effect)
                 clipboardManager.setText(AnnotatedString(text))
                 Toast.makeText(context, "복사되었습니다", Toast.LENGTH_SHORT).show()
             },
             onExportClicked = {
-                val text = "[${detail.usage.Type}] ${detail.usage.effect}"
+                val text = removeMarkdown(detail.usage.effect)
                 shareText(context, "용량/용법", text)
             }
         )
@@ -880,18 +1096,27 @@ fun DrugInfoTab(
             item = detail.usage,
             collapsedHeight = 186.dp
         ) { effect ->
-            Text("[${effect.Type}] ${effect.effect}")
+            Text(
+                text = removeMarkdown(effect.effect),
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    lineHeight = 23.4.sp,
+                    fontFamily = pretendard,
+                    fontWeight = FontWeight(500),
+                    color = gray800,
+                )
+            )
         }
-        HeightSpacer(42.dp)
+        HeightSpacer(32.dp)
         ExportAndCopy(
             headerText = "주의사항",
             onCopyClicked = {
-                val text = "[${detail.caution.Type}] ${detail.caution.effect}"
+                val text = removeMarkdown(detail.caution.effect)
                 clipboardManager.setText(AnnotatedString(text))
                 Toast.makeText(context, "복사되었습니다", Toast.LENGTH_SHORT).show()
             },
             onExportClicked = {
-                val text = "[${detail.caution.Type}] ${detail.caution.effect}"
+                val text = removeMarkdown(detail.caution.effect)
                 shareText(context, "주의사항", text)
             }
         )
@@ -899,7 +1124,16 @@ fun DrugInfoTab(
             item = detail.caution,
             collapsedHeight = 186.dp
         ) { effect ->
-            Text("[${effect.Type}] ${effect.effect}")
+            Text(
+                text = removeMarkdown(effect.effect),
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    fontFamily = pretendard,
+                    lineHeight = 23.4.sp,
+                    fontWeight = FontWeight(500),
+                    color = gray800,
+                )
+            )
         }
         HeightSpacer(100.dp)
     }
@@ -912,8 +1146,7 @@ fun StorageInfoTab(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .heightIn(min = 300.dp)
+            .height(350.dp)
             .padding(horizontal = 22.dp, vertical = 30.dp)
     ) {
         HeightSpacer(12.dp)
@@ -993,18 +1226,108 @@ fun StorageInfoTab(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ReviewTab(
+fun AudioSearchPage(
     navController: NavController,
-    detail: DetailDrugData
+    searchViewModel: SearchHiltViewModel,
+    logViewModel: LogViewModel
 ) {
+    val allKeywords = List(5) { index -> "키워드~${index + 1}" }
+    val selectedKeywords = remember { mutableStateListOf<String>() }
+
+    val context = LocalContext.current
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = RecognizeSpeech(),
+        onResult = { result: String? ->
+            result?.let { ttsText ->
+                searchViewModel.fetchDrugSearch(ttsText)
+                logViewModel.addSearchQuery(ttsText)
+                navController.popBackStack()
+                navController.navigate("SearchResultsPage/${ttsText}") {
+                    popUpTo("MainPage") { inclusive = false }
+                    launchSingleTop = true
+                }
+            }
+        }
+    )
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                speechLauncher.launch(Unit)
+            } else {
+                Toast.makeText(context, "마이크 권한이 필요해요", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .heightIn(min = 300.dp)
-            .padding(horizontal = 22.dp, vertical = 30.dp)
+            .background(Color(0xFFFDFDFD))
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 22.dp)
     ) {
-        Text("리뷰 페이지")
+        BackButton(
+            horizontalPadding = 0.dp,
+            verticalPadding = 0.dp
+        ) {
+            navController.popBackStack()
+        }
+        HeightSpacer(50.dp)
+        Text(
+            text = "어떤 점이 궁금하신가요?",
+            style = TextStyle(
+                fontSize = 24.sp,
+                lineHeight = 33.6.sp,
+                fontFamily = pretendard,
+                fontWeight = FontWeight(700),
+                color = Color(0xFF323439),
+            )
+        )
+        HeightSpacer(20.dp)
+        Text(
+            text = "음성으로 검색해보세요!",
+            style = TextStyle(
+                fontSize = 14.sp,
+                fontFamily = pretendard,
+                fontWeight = FontWeight(600),
+                color = gray400,
+            )
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .noRippleClickable {
+                    if (ContextCompat.checkSelfPermission(
+                            context,
+                            android.Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        speechLauncher.launch(Unit)
+                    } else {
+                        permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(R.drawable.btn_audio),
+                contentDescription = "뒤로가기 버튼",
+                modifier = Modifier.zIndex(1f)
+            )
+            Image(
+                imageVector = ImageVector.vectorResource(R.drawable.ic_audio_shadow),
+                contentDescription = "버튼 그림자",
+                modifier = Modifier
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 

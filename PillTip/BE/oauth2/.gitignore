@@ -40,10 +40,18 @@ out/
 
 ### application.properties 파일 ###
 application.properties
+firebasefbsvc*
+
+### SSL Certificate Files ###
+src/main/resources/ssl/*.pem
+src/main/resources/ssl/*.p12
+src/main/resources/ssl/keystore.*
 
 # macOS ###
 # macOS Finder files
-.DS_Store
-._.DS_Store
 **/.DS_Store
-**/._.DS_Store
+**/.DS_Store/**
+
+**/ssl/*
+
+**/upload/*

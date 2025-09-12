@@ -30,6 +30,7 @@ android {
 
         buildConfigField("String", "KAKAO_KEY", "\"$kakaoKey\"")
         resValue("string", "KAKAO_KEY", kakaoKey)
+        manifestPlaceholders["kakao_scheme"] = "kakao$kakaoKey"
     }
 
     buildTypes {
@@ -74,6 +75,8 @@ dependencies {
     implementation(libs.firebase.auth.ktx)
     implementation(libs.androidx.datastore.core.android)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation(libs.firebase.messaging.ktx)
+    implementation(libs.androidx.camera.view)
 
     ksp (libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
@@ -95,6 +98,19 @@ dependencies {
     //직렬화
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
+    /* AsyncImage */
+    implementation("io.coil-kt:coil-compose:2.4.0")
+
+    /* RatingBar */
+    implementation ("com.github.a914-gowtham:compose-ratingbar:1.3.12")
+
+    /* QR */
+    implementation ("com.google.mlkit:barcode-scanning:17.3.0")
+    // CameraX Core
+    implementation ("androidx.camera:camera-core:1.4.2")
+    implementation ("androidx.camera:camera-camera2:1.4.2")
+    implementation ("androidx.camera:camera-lifecycle:1.4.2")
+    implementation ("androidx.camera:camera-view:1.3.0")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

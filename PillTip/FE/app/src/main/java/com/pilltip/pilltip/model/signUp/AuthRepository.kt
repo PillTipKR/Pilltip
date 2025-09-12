@@ -86,9 +86,9 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun getMyInfo(token: String): UserData? {
+    suspend fun getMyInfo(token: String, profileId: Long?): UserData? {
         return try {
-            val response = authApi.getMyInfo("Bearer $token")
+            val response = authApi.getMyInfo("Bearer $token", profileId)
             if (response.isSuccessful) {
                 response.body()?.data
             } else {
@@ -106,7 +106,24 @@ class AuthRepository @Inject constructor(
         return when {
             phone.length == 11 -> "${phone.substring(0,3)}-${phone.substring(3,7)}-${phone.substring(7)}"
             phone.length == 10 -> "${phone.substring(0,3)}-${phone.substring(3,6)}-${phone.substring(6)}"
-            else -> phone // 예외 처리: 그냥 반환
+            else -> phone
+        }
+    }
+
+    suspend fun checkDuplicate(value: String, type: String): Pair<Boolean, Boolean?> {
+        return try {
+            val response = authApi.checkDuplicate(DuplicateCheckRequest(value, type))
+            Log.d("중복 검사 결과: ", response.toString())
+            if (response.isSuccessful) {
+                Pair(true, response.body()?.data)
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e("CheckDuplicate", "응답 실패 - 코드: ${response.code()}, 바디: $errorBody")
+                Pair(false, null)
+            }
+        } catch (e: Exception) {
+            Log.e("CheckDuplicate", "네트워크 오류 발생", e)
+            Pair(false, null)
         }
     }
 }

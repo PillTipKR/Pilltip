@@ -28,4 +28,10 @@ class LogViewModel(application: Application) : AndroidViewModel(application) {
             prefs.setSearchQueries(updated)
         }
     }
+
+    fun clearSearchQueries() {
+        viewModelScope.launch {
+            prefs.clearSearchQueries()
+        }
+    }
 }

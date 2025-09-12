@@ -43,4 +43,10 @@ class SearchPreferencesManager(private val context: Context) {
                 Json.decodeFromString(json)
             } else emptyList()
         }
+
+    suspend fun clearSearchQueries() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(SearchPreferencesKeys.RECENT_SEARCHES)
+        }
+    }
 }

@@ -41,11 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pilltip.pilltip.R
 import com.pilltip.pilltip.composable.HeightSpacer
+import com.pilltip.pilltip.composable.IosButton
 import com.pilltip.pilltip.composable.NextButton
 import com.pilltip.pilltip.composable.WheelColumn
 import com.pilltip.pilltip.composable.noRippleClickable
 import com.pilltip.pilltip.ui.theme.gray200
 import com.pilltip.pilltip.ui.theme.gray500
+import com.pilltip.pilltip.ui.theme.gray600
 import com.pilltip.pilltip.ui.theme.pretendard
 import com.pilltip.pilltip.ui.theme.primaryColor
 import com.pilltip.pilltip.ui.theme.primaryColor050
@@ -58,7 +60,9 @@ fun TimeField(
     initialAmPm: String?,
     initialHour: Int?,
     initialMinute: Int?,
-    timeChange: (String, Int, Int) -> Unit
+    timeChange: (String, Int, Int) -> Unit,
+    alarmChecked: Boolean,
+    onAlarmToggle: (Boolean) -> Unit
 ) {
     var selectedHour by remember { mutableStateOf<Int?>(null) }
     var selectedMinute by remember { mutableStateOf<Int?>(null) }
@@ -111,10 +115,9 @@ fun TimeField(
                 )
             }
 
-            Image(
-                imageVector = ImageVector.vectorResource(R.drawable.btn_right_gray_arrow),
-                contentDescription = "Time BottomSheet 열기",
-                modifier = Modifier.size(20.dp)
+            IosButton(
+                checked = alarmChecked,
+                onCheckedChange = { onAlarmToggle(it) }
             )
         }
     }
@@ -329,21 +332,18 @@ fun DayField(
             val isSelected = selectedDays[index]
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = 1.2.dp,
-                        color = if (isSelected) primaryColor else gray500,
-                        shape = CircleShape
-                    )
+                    .border(width = 1.dp, color = if(isSelected) primaryColor else Color.Transparent, shape = CircleShape)
+                    .padding(1.dp)
+                    .width(28.dp)
+                    .height(28.dp)
                     .noRippleClickable { onDayToggle(index) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = day,
                     fontFamily = pretendard,
-                    color = if (isSelected) primaryColor else gray500,
-                    fontWeight = FontWeight.Medium,
+                    color = if (isSelected) primaryColor else gray600,
+                    fontWeight = if(isSelected) FontWeight.W600 else FontWeight.W400,
                     fontSize = 14.sp
                 )
             }
