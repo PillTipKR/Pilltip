@@ -364,7 +364,7 @@ public class DrugImportService {
     }
 
     private String removeSquareBrackets(String name) {
-        // 예: "약이름 [수출명: 뭐시기]" → "약이름"
+        // 예: "약이름 [수출명: ~~~]" → "약이름"
         return name.replaceAll("\\[.*?]", "").trim();
     }
 
