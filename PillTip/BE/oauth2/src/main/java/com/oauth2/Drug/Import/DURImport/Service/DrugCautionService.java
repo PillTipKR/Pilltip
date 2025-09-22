@@ -1,8 +1,10 @@
 package com.oauth2.Drug.Import.DURImport.Service;
 
-import com.oauth2.Drug.DUR.Domain.DrugCaution;
+import com.oauth2.Drug.DUR.Domain.ConditionType;
+import com.oauth2.Drug.DUR.Domain.DurType;
+import com.oauth2.Drug.DUR.Domain.SubjectCaution;
 import com.oauth2.Drug.DrugInfo.Domain.Drug;
-import com.oauth2.Drug.DUR.Repository.DrugCautionRepository;
+import com.oauth2.Drug.DUR.Repository.SubjectCautionRepository;
 import com.oauth2.Drug.DrugInfo.Repository.DrugIngredientRepository;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
 import lombok.RequiredArgsConstructor;
@@ -54,18 +56,18 @@ public class DrugCautionService {
     private String ingredientPregnant;
 
 
-    private final DrugCautionRepository drugCautionRepository;
+    private final SubjectCautionRepository subjectCautionRepository;
     private final DrugRepository drugRepository;
     private final DrugIngredientRepository drugIngredientRepository;
 
-    private DrugCaution.ConditionType convertConditionType(String type) {
+    private ConditionType convertConditionType(String type) {
         return switch (type.trim()) {
-            case "투여기간주의" -> DrugCaution.ConditionType.PERIOD;
-            case "임부금기"     -> DrugCaution.ConditionType.PREGNANCY;
-            case "연령금기"     -> DrugCaution.ConditionType.AGE;
-            case "노인주의"     -> DrugCaution.ConditionType.ELDER;
-            case "수유부주의"   -> DrugCaution.ConditionType.LACTATION;
-            case "용량주의" -> DrugCaution.ConditionType.OVERDOSE;
+            case "투여기간주의" -> ConditionType.PERIOD;
+            case "임부금기"     -> ConditionType.PREGNANCY;
+            case "연령금기"     -> ConditionType.AGE;
+            case "노인주의"     -> ConditionType.ELDER;
+            case "수유부주의"   -> ConditionType.LACTATION;
+            case "용량주의" -> ConditionType.OVERDOSE;
             default -> throw new IllegalArgumentException("지원되지 않는 유형: " + type);
         };
     }
@@ -138,7 +140,7 @@ public class DrugCautionService {
             // 구분선(또는 다음 데이터 시작)
             else if (line.startsWith("==================")) {
                 if (productName != null && !productName.isBlank()) {
-                    saveCaution(productName, DrugCaution.ConditionType.PREGNANCY, conditionValue, note);
+                    saveCaution(productName, ConditionType.PREGNANCY, conditionValue, note);
                 }
 
                 // 초기화
@@ -148,7 +150,7 @@ public class DrugCautionService {
 
         // 마지막 데이터 처리
         if (productName != null && !productName.isBlank()) {
-            saveCaution(productName, DrugCaution.ConditionType.PREGNANCY, conditionValue, note);
+            saveCaution(productName, ConditionType.PREGNANCY, conditionValue, note);
         }
 
     }
@@ -168,7 +170,7 @@ public class DrugCautionService {
                 String conditionValue = record.get(7).trim();    // "1세 미만" 등
                 String note = record.get(8).trim();              // 위험성
 
-                saveCaution(productName, DrugCaution.ConditionType.AGE, conditionValue, note);
+                saveCaution(productName, ConditionType.AGE, conditionValue, note);
             }
         }
     }
@@ -190,7 +192,7 @@ public class DrugCautionService {
                 String conditionValue = record.get(4).trim();    // "1세 미만" 등
                 String note = record.get(5).trim();              // 위험성
 
-                saveCaution(productName, DrugCaution.ConditionType.OVERDOSE, conditionValue, note);
+                saveCaution(productName, ConditionType.OVERDOSE, conditionValue, note);
             }
         }
     }
@@ -210,7 +212,7 @@ public class DrugCautionService {
                 String conditionValue = record.get(4).trim();    // "1세 미만" 등
                 String note = "";              // 위험성
 
-                saveCaution(productName, DrugCaution.ConditionType.PERIOD, conditionValue, note);
+                saveCaution(productName, ConditionType.PERIOD, conditionValue, note);
             }
         }
     }
@@ -233,7 +235,7 @@ public class DrugCautionService {
         return name.split("\\(")[0];
     }
 
-    private void parseIngrCautions(String filePath, DrugCaution.ConditionType conditionType) throws IOException {
+    private void parseIngrCautions(String filePath, ConditionType conditionType) throws IOException {
         try (
                 Reader reader = new FileReader(filePath);
                 CSVParser csvParser = CSVFormat.DEFAULT
@@ -253,7 +255,7 @@ public class DrugCautionService {
                 if(drugIds.isEmpty()) continue;
 
                 for(Long id : drugIds){
-                    if(!drugCautionRepository.findByDrugIdAndConditionType(id, conditionType).isEmpty()) continue;
+                    if(!subjectCautionRepository.findBySubjectIdAndConditionType(id, conditionType).isEmpty()) continue;
                     saveIngredientCaution(id, conditionType,conditionValue, note);
                 }
             }
@@ -261,35 +263,37 @@ public class DrugCautionService {
     }
 
     public void parseIngrAll() throws IOException {
-        parseIngrCautions(ingredientAge, DrugCaution.ConditionType.AGE);
-        parseIngrCautions(ingredientElder, DrugCaution.ConditionType.ELDER);
-        parseIngrCautions(ingredientLactation, DrugCaution.ConditionType.LACTATION);
-        parseIngrCautions(ingredientPeriod, DrugCaution.ConditionType.PERIOD);
-        parseIngrCautions(ingredientPregnant, DrugCaution.ConditionType.PREGNANCY);
+        parseIngrCautions(ingredientAge, ConditionType.AGE);
+        parseIngrCautions(ingredientElder, ConditionType.ELDER);
+        parseIngrCautions(ingredientLactation, ConditionType.LACTATION);
+        parseIngrCautions(ingredientPeriod, ConditionType.PERIOD);
+        parseIngrCautions(ingredientPregnant, ConditionType.PREGNANCY);
     }
 
-    private void saveIngredientCaution(Long id, DrugCaution.ConditionType conditionType, String conditionValue, String note) {
-        DrugCaution caution = new DrugCaution();
-        caution.setDrugId(id);
+    private void saveIngredientCaution(Long id, ConditionType conditionType, String conditionValue, String note) {
+        SubjectCaution caution = new SubjectCaution();
+        caution.setSubjectId(id);
+        caution.setDurtype(DurType.DRUG);
         caution.setConditionType(conditionType);
         caution.setConditionValue(conditionValue);
         caution.setNote(note);
-        drugCautionRepository.save(caution);
+        subjectCautionRepository.save(caution);
     }
 
-    private void saveCaution(String productName, DrugCaution.ConditionType conditionTypeStr, String conditionValue, String note) {
+    private void saveCaution(String productName, ConditionType conditionTypeStr, String conditionValue, String note) {
         productName = removeLeadingParentheses(productName);
         List<Drug> drugs = drugRepository.findByNameContaining(productName);
         if (!drugs.isEmpty()) {
             Drug drug = drugs.get(0);
-            if(!drugCautionRepository.findByDrugIdAndConditionType(drug.getId(), conditionTypeStr).isEmpty()) return;
-            DrugCaution caution = new DrugCaution();
-            caution.setDrugId(drug.getId());
+            if(!subjectCautionRepository.findBySubjectIdAndConditionType(drug.getId(), conditionTypeStr).isEmpty()) return;
+            SubjectCaution caution = new SubjectCaution();
+            caution.setSubjectId(drug.getId());
+            caution.setDurtype(DurType.DRUG);
             caution.setConditionType(conditionTypeStr);
             caution.setConditionValue(conditionValue);
             caution.setNote(note);
 
-            drugCautionRepository.save(caution);
+            subjectCautionRepository.save(caution);
         } else {
             System.out.println(" 약품명 [" + productName + "] 을(를) 찾을 수 없습니다.");
         }
@@ -304,13 +308,13 @@ public class DrugCautionService {
     }
 
 
-    public DrugCaution save(DrugCaution drugCaution) {
-        return drugCautionRepository.save(drugCaution);
+    public SubjectCaution save(SubjectCaution subjectCaution) {
+        return subjectCautionRepository.save(subjectCaution);
     }
     public void delete(Long id) {
-        drugCautionRepository.deleteById(id);
+        subjectCautionRepository.deleteById(id);
     }
-    public DrugCaution findById(Long id) {
-        return drugCautionRepository.findById(id).orElse(null);
+    public SubjectCaution findById(Long id) {
+        return subjectCautionRepository.findById(id).orElse(null);
     }
 }

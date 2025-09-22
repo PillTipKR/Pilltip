@@ -2,18 +2,15 @@ package com.oauth2.Util.Redis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.oauth2.Drug.DUR.Domain.DrugCaution;
-import com.oauth2.Drug.DUR.Domain.DrugInteraction;
+import com.oauth2.Drug.DUR.Domain.DurType;
+import com.oauth2.Drug.DUR.Domain.SubjectCaution;
+import com.oauth2.Drug.DUR.Domain.SubjectInteraction;
 import com.oauth2.Drug.DUR.Domain.DrugTherapeuticDup;
 import com.oauth2.Drug.DrugInfo.Domain.Drug;
-import com.oauth2.Drug.DUR.Repository.DrugCautionRepository;
-import com.oauth2.Drug.DUR.Repository.DrugInteractionRepository;
+import com.oauth2.Drug.DUR.Repository.SubjectCautionRepository;
+import com.oauth2.Drug.DUR.Repository.SubjectInteractionRepository;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
 import com.oauth2.Drug.DUR.Repository.DrugTherapeuticDupRepository;
-import com.oauth2.HealthSupplement.DUR.Entity.HealthSupplementCaution;
-import com.oauth2.HealthSupplement.DUR.Entity.HealthSupplementInteraction;
-import com.oauth2.HealthSupplement.DUR.Repository.HealthSupplementCautionRepository;
-import com.oauth2.HealthSupplement.DUR.Repository.SupplementInteractionRepository;
 import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,10 +29,8 @@ import java.util.stream.Collectors;
 public class DurRedisLoader {
 
     private final StringRedisTemplate redisTemplate;
-    private final DrugInteractionRepository drugInteractionRepository;
-    private final SupplementInteractionRepository supplementInteractionRepository;
-    private final DrugCautionRepository drugCautionRepository;
-    private final HealthSupplementCautionRepository healthSupplementCautionRepository;
+    private final SubjectInteractionRepository subjectInteractionRepository;
+    private final SubjectCautionRepository subjectCautionRepository;
     private final DrugTherapeuticDupRepository dupRepo;
     private final ObjectMapper objectMapper;
     private final DrugRepository drugRepository;
@@ -62,15 +57,15 @@ public class DurRedisLoader {
     }
 
     private void saveDrugInteractions() throws JsonProcessingException {
-        List<DrugInteraction> interactions = drugInteractionRepository.findAll();
+        List<SubjectInteraction> interactions = subjectInteractionRepository.findByDurtype1AndDurtype2(DurType.DRUG,DurType.DRUG);
         Map<String, List<String>> map = new HashMap<>();
         Map<Long, String> drugIdNameMap = drugRepository.findAll().stream()
                 .collect(Collectors.toMap(Drug::getId, Drug::getName));
 
-        for (DrugInteraction di : interactions) {
-            map.computeIfAbsent(drugIdNameMap.get(di.getDrugId1()), k -> new ArrayList<>()).add(drugIdNameMap.get(di.getDrugId2()));
+        for (SubjectInteraction di : interactions) {
+            map.computeIfAbsent(drugIdNameMap.get(di.getSubjectId1()), k -> new ArrayList<>()).add(drugIdNameMap.get(di.getSubjectId2()));
             // 상세 정보 저장
-            String key1 = drugInterDetailTag + drugIdNameMap.get(di.getDrugId1()) + ":" + drugIdNameMap.get(di.getDrugId2());
+            String key1 = drugInterDetailTag + drugIdNameMap.get(di.getSubjectId1()) + ":" + drugIdNameMap.get(di.getSubjectId2());
 
             Map<String, String> value = Map.of(
                     "reason", di.getReason() == null ? "" : di.getReason(),
@@ -85,7 +80,7 @@ public class DurRedisLoader {
     }
 
     private void saveSupplementInteractions() throws JsonProcessingException {
-        List<HealthSupplementInteraction> interactions = supplementInteractionRepository.findAll();
+        List<SubjectInteraction> interactions = subjectInteractionRepository.findByDurtype1AndDurtype2(DurType.DRUG,DurType.SUPPLEMENT);
         Map<String, List<String>> supplementMap = new HashMap<>();
         Map<String, List<String>> drugMap = new HashMap<>();
         Map<Long, String> drugIdNameMap = drugRepository.findAll().stream()
@@ -94,11 +89,11 @@ public class DurRedisLoader {
         Map<Long, String> supplementIdNameMap = healthSupplementRepository.findAll().stream()
                 .collect(Collectors.toMap(HealthSupplement::getId, HealthSupplement::getProductName));
 
-        for (HealthSupplementInteraction si : interactions) {
-            drugMap.computeIfAbsent(drugIdNameMap.get(si.getDrugId()), k-> new ArrayList<>()).add(supplementIdNameMap.get(si.getSupplementId()));
-            supplementMap.computeIfAbsent(supplementIdNameMap.get(si.getSupplementId()), k -> new ArrayList<>()).add(drugIdNameMap.get(si.getDrugId()));
+        for (SubjectInteraction si : interactions) {
+            drugMap.computeIfAbsent(drugIdNameMap.get(si.getSubjectId1()), k-> new ArrayList<>()).add(supplementIdNameMap.get(si.getSubjectId2()));
+            supplementMap.computeIfAbsent(supplementIdNameMap.get(si.getSubjectId2()), k -> new ArrayList<>()).add(drugIdNameMap.get(si.getSubjectId1()));
             // 상세 정보 저장
-            String key1 = supplementDrugDetailInterTag + supplementIdNameMap.get(si.getSupplementId()) + ":" + drugIdNameMap.get(si.getDrugId());
+            String key1 = supplementDrugDetailInterTag + supplementIdNameMap.get(si.getSubjectId2()) + ":" + drugIdNameMap.get(si.getSubjectId1());
 
             Map<String, String> value = Map.of(
                     "reason", si.getReason() == null ? "" : si.getReason(),
@@ -123,10 +118,10 @@ public class DurRedisLoader {
     }
 
     private void saveDrugCautions() throws JsonProcessingException {
-        List<DrugCaution> cautions = drugCautionRepository.findAll();
+        List<SubjectCaution> cautions = subjectCautionRepository.findByDurtype(DurType.DRUG);
 
-        for (DrugCaution dc : cautions) {
-            String key = "DRUG:DUR:" + dc.getConditionType().name() + ":" + dc.getDrugId();
+        for (SubjectCaution dc : cautions) {
+            String key = "DRUG:DUR:" + dc.getConditionType().name() + ":" + dc.getSubjectId();
             Map<String, String> value = Map.of(
                     "conditionValue", dc.getConditionValue() == null ? "" : dc.getConditionValue(),
                     "note", dc.getNote() == null ? "" : dc.getNote()
@@ -136,10 +131,10 @@ public class DurRedisLoader {
     }
 
     private void saveSupplementCautions() throws JsonProcessingException {
-        List<HealthSupplementCaution> cautions = healthSupplementCautionRepository.findAll();
+        List<SubjectCaution> cautions = subjectCautionRepository.findByDurtype(DurType.SUPPLEMENT);
 
-        for (HealthSupplementCaution hc : cautions) {
-            String key = "SUPPLEMENT:DUR:" + hc.getConditionType().name() + ":" + hc.getSupplementId();
+        for (SubjectCaution hc : cautions) {
+            String key = "SUPPLEMENT:DUR:" + hc.getConditionType().name() + ":" + hc.getSubjectId();
             Map<String, String> value = Map.of(
                     "conditionValue", "",
                     "note", ""

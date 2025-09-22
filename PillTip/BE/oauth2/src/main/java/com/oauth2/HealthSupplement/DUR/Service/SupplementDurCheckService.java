@@ -7,8 +7,8 @@ import com.oauth2.Drug.DUR.Dto.DurUserContext;
 import com.oauth2.Drug.DUR.Service.DurCheckService;
 import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
-import com.oauth2.User.TakingPill.Dto.TakingPillSummaryResponse;
-import com.oauth2.User.TakingPill.Service.TakingPillService;
+import com.oauth2.User.TakingSupplement.Dto.TakingSupplementSummaryResponse;
+import com.oauth2.User.TakingSupplement.Service.TakingSupplementService;
 import com.oauth2.User.UserInfo.Entity.User;
 import com.oauth2.User.UserInfo.Entity.UserProfile;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ public class SupplementDurCheckService {
     private final StringRedisTemplate redisTemplate;
     private final DurCheckService durCheckService;
     private final HealthSupplementRepository healthSupplementRepository;
-    private final TakingPillService takingPillService;
+    private final TakingSupplementService takingSupplementService;
 
     @Value("${redis.supplement.drug.detail.tag}")
     private String supplementDrugDetailTag;
@@ -82,8 +82,8 @@ public class SupplementDurCheckService {
 
 
         // 건기식 등록으로 변경하기!
-        List<Long> supplementIds = takingPillService.getTakingPillSummary(user).getTakingPills().stream()
-                .map(TakingPillSummaryResponse.TakingPillSummary::getMedicationId)
+        List<Long> supplementIds = takingSupplementService.getTakingSupplementSummary(user).getTakingSupplements().stream()
+                .map(TakingSupplementSummaryResponse.TakingSupplementSummary::getSupplementId)
                 .toList();
 
         for (Long userSupplementId : supplementIds) {

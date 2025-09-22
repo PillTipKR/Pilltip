@@ -1,8 +1,9 @@
 package com.oauth2.Drug.Import.DURImport.Service;
 
-import com.oauth2.Drug.DUR.Domain.DrugInteraction;
+import com.oauth2.Drug.DUR.Domain.DurType;
+import com.oauth2.Drug.DUR.Domain.SubjectInteraction;
 import com.oauth2.Drug.DrugInfo.Domain.Drug;
-import com.oauth2.Drug.DUR.Repository.DrugInteractionRepository;
+import com.oauth2.Drug.DUR.Repository.SubjectInteractionRepository;
 import com.oauth2.Drug.DrugInfo.Repository.DrugIngredientRepository;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DrugInteractionService {
 
-    private final DrugInteractionRepository drugInteractionRepository;
+    private final SubjectInteractionRepository subjectInteractionRepository;
     private final DrugIngredientRepository drugIngredientRepository;
     private final DrugRepository drugRepository;
 
@@ -137,9 +138,9 @@ public class DrugInteractionService {
 
                 for(Long id1 : drugId1){
                     for(Long id2: drugId2){
-                        if(!drugInteractionRepository.findByDrugId1AndDrugId2(id1,id2).isEmpty()) continue;
+                        if(!subjectInteractionRepository.findBySubjectId1AndDurtype1AndSubjectId2AndDurtype2(id1,DurType.DRUG, id2,DurType.DRUG).isEmpty()) continue;
                         saveIngredientInteraction(id1, id2, reason, note);
-                        if(!drugInteractionRepository.findByDrugId1AndDrugId2(id2,id1).isEmpty()) continue;
+                        if(!subjectInteractionRepository.findBySubjectId1AndDurtype1AndSubjectId2AndDurtype2(id2,DurType.DRUG,id1,DurType.DRUG).isEmpty()) continue;
                         saveIngredientInteraction(id2, id1, reason, note);
                     }
                 }
@@ -148,13 +149,15 @@ public class DrugInteractionService {
     }
 
     private void saveIngredientInteraction(Long id1, Long id2, String reason, String note) {
-        DrugInteraction drugInteraction = new DrugInteraction();
-        drugInteraction.setDrugId1(id1);
-        drugInteraction.setDrugId2(id2);
-        drugInteraction.setReason(reason);
-        drugInteraction.setNote(note);
+        SubjectInteraction subjectInteraction = new SubjectInteraction();
+        subjectInteraction.setSubjectId1(id1);
+        subjectInteraction.setSubjectId2(id2);
+        subjectInteraction.setDurtype1(DurType.DRUG);
+        subjectInteraction.setDurtype2(DurType.DRUG);
+        subjectInteraction.setReason(reason);
+        subjectInteraction.setNote(note);
 
-        save(drugInteraction);
+        save(subjectInteraction);
     }
 
     private void saveDrugInteraction(String pName1, String pName2, String reason, String note){
@@ -166,16 +169,18 @@ public class DrugInteractionService {
         if(!idList1.isEmpty() && !idList2.isEmpty()) {
             Drug id1 = idList1.get(0);
             Drug id2 = idList2.get(0);
-            List<DrugInteraction> drugInter =
-                    drugInteractionRepository.findByDrugId1AndDrugId2(id1.getId(), id2.getId());
+            List<SubjectInteraction> drugInter =
+                    subjectInteractionRepository.findBySubjectId1AndDurtype1AndSubjectId2AndDurtype2(id1.getId(), DurType.DRUG,id2.getId(),DurType.DRUG);
             if(drugInter.isEmpty()) {
-                DrugInteraction drugInteraction = new DrugInteraction();
-                drugInteraction.setDrugId1(id1.getId());
-                drugInteraction.setDrugId2(id2.getId());
-                drugInteraction.setReason(reason);
-                drugInteraction.setNote(note);
+                SubjectInteraction subjectInteraction = new SubjectInteraction();
+                subjectInteraction.setSubjectId1(id1.getId());
+                subjectInteraction.setSubjectId2(id2.getId());
+                subjectInteraction.setDurtype1(DurType.DRUG);
+                subjectInteraction.setDurtype2(DurType.DRUG);
+                subjectInteraction.setReason(reason);
+                subjectInteraction.setNote(note);
 
-                save(drugInteraction);
+                save(subjectInteraction);
             }
 
         }else {
@@ -183,13 +188,13 @@ public class DrugInteractionService {
         }
     }
 
-    public DrugInteraction save(DrugInteraction drugInteraction) {
-        return drugInteractionRepository.save(drugInteraction);
+    public SubjectInteraction save(SubjectInteraction subjectInteraction) {
+        return subjectInteractionRepository.save(subjectInteraction);
     }
     public void delete(Long id) {
-        drugInteractionRepository.deleteById(id);
+        subjectInteractionRepository.deleteById(id);
     }
-    public DrugInteraction findById(Long id) {
-        return drugInteractionRepository.findById(id).orElse(null);
+    public SubjectInteraction findById(Long id) {
+        return subjectInteractionRepository.findById(id).orElse(null);
     }
 }

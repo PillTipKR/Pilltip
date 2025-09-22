@@ -26,6 +26,17 @@ public class DrugDurTaggingService {
     private final SupplementDurCheckService supplementDurCheckService;
     private final TakingPillRepository takingPillRepository;
 
+    public Boolean checkDrugsDur(User user, Drug drug) throws JsonProcessingException {
+        if (drug == null) return false; // 약 정보를 찾을 수 없는 경우 건너뛰기
+
+        DurUserContext drugUserContext = durCheckService.buildUserContext(user);
+        DurUserContext supplementUserContext = supplementDurCheckService.buildUserContext(user);
+
+        List<DurTagDto> tags = durCheckService.checkForDrugAndSupplement(drug, user.getUserProfile(), drugUserContext, supplementUserContext);
+        tags = tags.stream().filter(DurTagDto::isTrue).toList();
+        return tags.isEmpty();
+    }
+
     public List<SearchDurDto> generateTagsForDrugs(User user, List<SearchIndexDTO> drugs) throws JsonProcessingException {
         DurUserContext drugUserContext = durCheckService.buildUserContext(user);
         DurUserContext supplementUserContext = supplementDurCheckService.buildUserContext(user);

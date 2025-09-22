@@ -37,6 +37,7 @@ public class DrugDurImportController {
     public ResponseEntity<String> importCautionFromPath() {
         try {
             drugCautionService.parseIngrAll();
+            drugCautionService.parseAllAndSave();
             return ResponseEntity.ok("주의 정보 저장 완료");
         } catch (Exception e) {
             logger.error("Error occurred in import caution: {}", e.getMessage());
