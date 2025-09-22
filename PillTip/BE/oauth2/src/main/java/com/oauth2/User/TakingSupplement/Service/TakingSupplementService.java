@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
-import com.oauth2.User.TakingPill.Dto.TakingPillSummaryResponse;
 import com.oauth2.User.TakingPill.Entity.*;
 import com.oauth2.User.TakingSupplement.Dto.TakingSupplementDetailResponse;
 import com.oauth2.User.TakingSupplement.Dto.TakingSupplementRequest;
