@@ -4,8 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.oauth2.Account.Dto.ApiResponse;
 import com.oauth2.Account.Entity.Account;
 import com.oauth2.Account.Service.AccountService;
+import com.oauth2.Drug.DUR.Domain.DurType;
+import com.oauth2.Drug.DUR.Service.DurService;
 import com.oauth2.Drug.Prompt.Dto.DurResponse;
-import com.oauth2.HealthSupplement.DUR.Service.SupplementDurService;
 import com.oauth2.HealthSupplement.DetailPage.Dto.SupplementDetail;
 import com.oauth2.HealthSupplement.Prompt.Service.SupplementPromptService;
 import com.oauth2.User.UserInfo.Entity.User;
@@ -22,8 +23,8 @@ import java.nio.file.AccessDeniedException;
 public class SupplementPromptController {
 
     private final SupplementPromptService supplementPromptService;
-    private final SupplementDurService supplementDurService;
     private final AccountService accountService;
+    private final DurService durService;
 
     @PostMapping("/detailPage/gpt")
     public ResponseEntity<ApiResponse<String>> askGPT(
@@ -47,7 +48,7 @@ public class SupplementPromptController {
         User user = accountService.findUserByProfileId(profileId, account.getId());
         // 복약 완료 처리 로직
         DurResponse response =
-                supplementPromptService.askDur(supplementDurService.generateTagsForSupplementAndDrug(user, supplementId, drugId));
+                supplementPromptService.askDur(durService.generateTagsForDurEntities(user, supplementId, drugId, DurType.SUPPLEMENT,DurType.DRUG));
         return ResponseEntity.ok().body(ApiResponse.success(response));
     }
 

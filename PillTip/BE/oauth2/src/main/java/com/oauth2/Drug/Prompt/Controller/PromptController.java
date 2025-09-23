@@ -1,7 +1,8 @@
 package com.oauth2.Drug.Prompt.Controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.oauth2.Drug.DUR.Service.DrugDurService;
+import com.oauth2.Drug.DUR.Domain.DurType;
+import com.oauth2.Drug.DUR.Service.DurService;
 import com.oauth2.Drug.DetailPage.Dto.DrugDetail;
 import com.oauth2.Drug.Prompt.Dto.DurResponse;
 import com.oauth2.Drug.Prompt.Service.DrugPromptService;
@@ -22,7 +23,7 @@ import java.nio.file.AccessDeniedException;
 public class PromptController {
 
     private final DrugPromptService drugPromptService;
-    private final DrugDurService drugDurService;
+    private final DurService durService;
     private final AccountService accountService;
 
     @PostMapping("/detailPage/gpt")
@@ -47,7 +48,7 @@ public class PromptController {
         User user = accountService.findUserByProfileId(profileId, account.getId());
         // 복약 완료 처리 로직
         DurResponse response =
-                drugPromptService.askDur(drugDurService.generateTagsForDrugs(user, drugId1, drugId2));
+                drugPromptService.askDur(durService.generateTagsForDurEntities(user, drugId1, drugId2, DurType.DRUG,DurType.DRUG));
         return ResponseEntity.ok().body(ApiResponse.success(response));
     }
 

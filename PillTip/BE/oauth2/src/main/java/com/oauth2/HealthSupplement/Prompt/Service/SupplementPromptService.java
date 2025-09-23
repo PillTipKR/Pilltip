@@ -1,9 +1,9 @@
 package com.oauth2.HealthSupplement.Prompt.Service;
 
+import com.oauth2.Drug.DUR.Dto.DurAnalysisResponse;
 import com.oauth2.Drug.DUR.Dto.DurDto;
 import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import com.oauth2.Drug.Prompt.Dto.*;
-import com.oauth2.HealthSupplement.DUR.Dto.SupplementDurAnalysisResponse;
 import com.oauth2.HealthSupplement.DetailPage.Dto.SupplementDetail;
 import com.oauth2.HealthSupplement.DetailPage.Dto.SupplementRequestInfoDto;
 import com.oauth2.HealthSupplement.Prompt.Dto.SupplementPromptRequestDto;
@@ -90,7 +90,7 @@ public class SupplementPromptService {
         return askGPT(prompt);
     }
 
-    public DurResponse askDur(SupplementDurAnalysisResponse durAnalysisResponse){
+    public DurResponse askDur(DurAnalysisResponse durAnalysisResponse){
         String prompt = buildCombinedDurPrompt(durAnalysisResponse);
         String gptResponse = askGPT(prompt); // OpenAI 응답 전체 텍스트
         DurExplanationResult result = parseCombinedResponse(gptResponse);
@@ -100,13 +100,13 @@ public class SupplementPromptService {
         String interactExplanation = result.interact();
 
         return new DurResponse(
-                durAnalysisResponse.durDrug().drugName(),
-                durAnalysisResponse.durSupplement().drugName(),
+                durAnalysisResponse.durA().drugName(),
+                durAnalysisResponse.durB().drugName(),
                 drugExplanation,
                 supplementExplanation,
                 interactExplanation,
-                !durAnalysisResponse.durDrug().durtags().isEmpty(),
-                !durAnalysisResponse.durSupplement().durtags().isEmpty(),
+                !durAnalysisResponse.durA().durtags().isEmpty(),
+                !durAnalysisResponse.durB().durtags().isEmpty(),
                 !durAnalysisResponse.interact().durtags().isEmpty()
         );
     }
@@ -139,29 +139,29 @@ public class SupplementPromptService {
         return response.getBody().getChoices().get(0).getMessage().getContent();
     }
 
-    private String buildCombinedDurPrompt(SupplementDurAnalysisResponse response) {
+    private String buildCombinedDurPrompt(DurAnalysisResponse response) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("아래는 한 사용자가 복용하려는 약-건강기능식품간 병용 조합에 대한 DUR 정보예요.\n\n");
 
         // 약물 A
-        sb.append("약:\n");
-        sb.append("- drugName: ").append(response.durDrug().drugName()).append("\n");
+        sb.append("약/건강기능식품:\n");
+        sb.append("- name: ").append(response.durA().drugName()).append("\n");
         sb.append("- durtags: ");
-        appendDurTagsExpanded(sb, response.durDrug().durtags());
+        appendDurTagsExpanded(sb, response.durA().durtags());
         sb.append("- isTakingOtherDrugs: ").append(response.userTaken()).append("\n\n");
 
         // 약물 B
-        sb.append("건강기능식품:\n");
-        sb.append("- supplementName: ").append(response.durSupplement().drugName()).append("\n");
+        sb.append("약/건강기능식품:\n");
+        sb.append("- name: ").append(response.durB().drugName()).append("\n");
         sb.append("- durtags: ");
-        appendDurTagsExpanded(sb, response.durSupplement().durtags());
+        appendDurTagsExpanded(sb, response.durB().durtags());
         sb.append("- isTakingOtherDrugs: ").append(response.userTaken()).append("\n\n");
 
         // 병용 DUR
         sb.append("병용 DUR:\n");
-        sb.append("- 조합: ").append(response.durDrug().drugName())
-                .append(" + ").append(response.durSupplement().drugName()).append("\n");
+        sb.append("- 조합: ").append(response.durA().drugName())
+                .append(" + ").append(response.durB().drugName()).append("\n");
         sb.append("- durtags: ");
         appendDurTagsExpanded(sb, response.interact().durtags());
         sb.append("\n");

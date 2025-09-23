@@ -19,7 +19,7 @@ import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/agent")
+@RequestMapping("/api/agent")
 public class AgentController {
 
     private final AgentOrchestrator orchestrator;

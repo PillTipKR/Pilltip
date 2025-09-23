@@ -41,7 +41,7 @@ public class AgentOrchestrator {
     private final AskUserTool askUserTool;
     private final DoseInfoTool doseInfoTool;
     private final DurFilterTool durFilterTool;
-    private final DurTools durTools;
+    private final DurTool durTool;
     private final ProductRagTool productRagTool;
 
     private final ObjectMapper objectMapper; // JSON 파싱용
@@ -53,10 +53,11 @@ public class AgentOrchestrator {
             - 증상을 설명하면 반드시 ProductRagTool 툴을 호출
             - 제품/추천 요청이면 반드시 ProductRagTool 툴 호출.
             - ProductRagTool 응답의 candidates를 DurFilterTool req.candidates로 그대로 전달.
+            - 약,약의 성분,건강기능식품,건강기능식품의 성분들 간의 상호작용 질문시, 제품 이름 혹은 성분 이름들을 미리 파싱해두고, 이를 DurTool에 전달
             - 필요한 값이 비면 AskUserTool로 1~2개만 짧게 되물음.
             - (중요) 이 단계에서는 '최종 답변 문장'을 쓰지 말 것. 가능한 한 툴 호출만 생성.
             지원 범위:
-            - 제품/성분 후보 찾기(ProductRagTool), DUR 상호작용/금기/주의 필터(DurFilterTool), (필요시) DUR 근거 보강(DurRagTool), 추가질문(AskUserTool)
+            - 제품/성분 후보 찾기(ProductRagTool), DUR 상호작용/금기/주의 정보 알림(DurTool), 추가질문(AskUserTool)
             출력 스키마:
             - DurFilterTool 응답(JSON): { "filtered":[{ "id":long, "name":string, "effect":string }], "count": int }
             스코프 밖 요청 처리:
@@ -111,7 +112,7 @@ public class AgentOrchestrator {
 
         // 2) 툴 콜백 + 자동실행 OFF (플래닝 전용 옵션: detectOpts)
         ToolCallback[] callbacks = ToolCallbacks.from(
-                askUserTool, doseInfoTool, productRagTool, durTools
+                askUserTool, doseInfoTool, productRagTool, durTool
         );
         var detectOpts = OpenAiChatOptions.builder()
                 .internalToolExecutionEnabled(false)   // 플래닝만

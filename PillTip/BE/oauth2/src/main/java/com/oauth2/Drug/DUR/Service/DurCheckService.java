@@ -3,10 +3,13 @@ package com.oauth2.Drug.DUR.Service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oauth2.Drug.DUR.Domain.DurEntity;
+import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DUR.Dto.DurDto;
 import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import com.oauth2.Drug.DUR.Dto.DurUserContext;
 import com.oauth2.Drug.DrugInfo.Domain.Drug;
+import com.oauth2.Drug.DrugInfo.Domain.Ingredient;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
 import com.oauth2.User.UserInfo.Entity.User;
 import com.oauth2.User.TakingPill.Dto.TakingPillSummaryResponse;
@@ -30,35 +33,54 @@ public class DurCheckService {
     private final DrugRepository drugRepository;
     private final TakingPillService takingPillService;
 
-    @Value("${redis.supplement.drug.detail.tag}")
-    private String supDrugDetailTag;
+    @Value("${redis.inter.tag}")
+    private String interTag;
 
-    @Value("${redis.drug.inter.detail.tag}")
-    private String drugDetailTag;
+    @Value("${redis.inter.detail.tag}")
+    private String interDetailTag;
 
-    @Value("${redis.drug.inter.tag}")
-    private String drugInterTag;
+    @Value("${redis.drug.tag}")
+    private String drugTag;
 
-    @Value("${redis.supplement.drug.tag}")
-    private String supplementInterTag;
+    @Value("${redis.supplement.tag}")
+    private String supplementTag;
 
-    public List<DurTagDto> checkForWithoutInteraction(Drug drug, UserProfile userProfile, DurUserContext userContext) throws JsonProcessingException {
+    @Value("${redis.drug.ingr.tag}")
+    private String drugIngrTag;
+
+    @Value("${redis.supplement.ingr.tag}")
+    private String supplementIngrTag;
+
+    public List<DurTagDto> checkForWithoutInteraction(Long id, DurType durType, UserProfile userProfile, DurUserContext userContext) throws JsonProcessingException {
         List<DurTagDto> tags = new ArrayList<>();
-        Long drugId = drug.getId();
+        String key = "";
+        switch(durType){
+            case DRUG -> key=drugTag;
+            case DRUGINGR -> key=drugIngrTag;
+            case SUPPLEMENT -> key=supplementTag;
+            default -> key=supplementIngrTag;
+        }
 
         // 임부금기
-        tags.add(buildDurTag("임부금기", readJsonFromRedis("DRUG:DUR:PREGNANCY:" + drugId), userProfile.isPregnant()));
+        String pregTag = ":DUR:PREGNANCY:";
+        tags.add(buildDurTag("임부금기", readJsonFromRedis(key+ pregTag + id), userProfile.isPregnant()));
 
         // 노인금기
-        tags.add(buildDurTag("노인금기", readJsonFromRedis("DRUG:DUR:ELDER:" + drugId), userContext.isElderly()));
+        String elderTag = ":DUR:ELDER:";
+        tags.add(buildDurTag("노인금기", readJsonFromRedis(key+ elderTag + id), userContext.isElderly()));
 
         // 연령금기
-        Map<String, String> ageValue = readJsonFromRedis("DRUG:DUR:AGE:" + drugId);
-        boolean showAgeTag = ageValue != null && isUserInRestrictedAge(userProfile.getBirthDate(), ageValue.get("conditionValue"));
+        String ageTag = ":DUR:AGE:";
+        Map<String, String> ageValue = readJsonFromRedis(key+ ageTag + id);
+        boolean showAgeTag = false;
+        if(key.equals(drugTag))
+            showAgeTag = ageValue != null && isUserInRestrictedAge(userProfile.getBirthDate(), ageValue.get("conditionValue"));
+        else if(key.equals(supplementTag))
+            showAgeTag = ageValue != null && userProfile.getAge() <= 12;
         tags.add(buildDurTag("연령금기", ageValue, showAgeTag));
 
         // 효능군 중복주의
-        Map<String, String> therValue = readJsonFromRedis("DRUG:DUR:THERAPEUTIC_DUP:" + drugId);
+        Map<String, String> therValue = readJsonFromRedis(key+":DUR:THERAPEUTIC_DUP:" + id);
         String className = therValue != null ? therValue.get("className") : null;
         boolean isDup = className != null && userContext.classToProductIdsMap().containsKey(className);
         tags.add(buildDurTag("효능군중복주의", therValue, isDup));
@@ -66,18 +88,38 @@ public class DurCheckService {
         return tags;
     }
 
-    public List<DurTagDto> checkForDrugAndSupplement(Drug drug, UserProfile userProfile,
-                                        DurUserContext drugUserContext, DurUserContext supplementUserContext) throws JsonProcessingException {
-        List<DurTagDto> tags = checkForWithoutInteraction(drug,userProfile,drugUserContext);
-        String drugName = drug.getName();
+    public List<DurTagDto> checkForInteractions(DurEntity durEntity, DurType durType, UserProfile userProfile,
+                                                     DurUserContext drugUserContext, DurUserContext supplementUserContext) throws JsonProcessingException {
+        List<DurTagDto> tags = checkForWithoutInteraction(durEntity.getId(),durType,userProfile,drugUserContext);
+        String name = durEntity.getName();
+
+        String key1 = "";
+        String key2 = switch (durType) {
+            case DRUG -> {
+                key1 = drugTag + interDetailTag;
+                yield supplementTag + "-" + drugTag + interDetailTag;
+            }
+            case SUPPLEMENT -> {
+                key1 = supplementTag + "-" + drugTag + interDetailTag;
+                yield supplementTag + interDetailTag;
+            }
+            case DRUGINGR -> {
+                key1 = drugTag + "-" + drugIngrTag + interDetailTag;
+                yield supplementTag + "-" + drugIngrTag + interDetailTag;
+            }
+            default -> {
+                key1 = drugTag + "-" + supplementIngrTag + interDetailTag;
+                yield supplementTag + "-" + supplementIngrTag + interDetailTag;
+            }
+        };
 
         tags.add(
-                buildDrugSupplementContraTag(drugName,
-                drugUserContext.userInteractionProductNames(),
-                supplementUserContext.userInteractionProductNames(),
-                supDrugDetailTag,
-                drugDetailTag
-        ));
+                buildContraTag(name,
+                        drugUserContext.userInteractionProductNames(),
+                        supplementUserContext.userInteractionProductNames(),
+                        key1,
+                        key2
+                ));
 
         return tags;
     }
@@ -101,8 +143,8 @@ public class DurCheckService {
             if (userDrugOpt.isEmpty()) continue;
 
             String drugName = userDrugOpt.get().getName();
-            List<String> drugContraList = redisTemplate.opsForList().range(drugInterTag + drugName, 0, -1);
-            List<String> supplementContraList = redisTemplate.opsForList().range(supplementInterTag + drugName, 0, -1);
+            List<String> drugContraList = redisTemplate.opsForList().range(drugTag + interTag + drugName, 0, -1);
+            List<String> supplementContraList = redisTemplate.opsForList().range(supplementTag + interTag + drugName, 0, -1);
             if (drugContraList != null && !drugContraList.isEmpty()) userInteractionDrugNames.add(drugName);
             if(supplementContraList != null && !supplementContraList.isEmpty()) userInteractionDrugNames.add(drugName);
 
@@ -130,30 +172,25 @@ public class DurCheckService {
         return new DurTagDto(tagName, list, shouldTag && !list.isEmpty());
     }
 
-    // 방향 플래그를 받아서 detailKey 생성
-    private void tryAddInteraction(String name1, String tag, String name2, boolean reverseKey, List<DurDto> tagDesc) throws JsonProcessingException {
-        String key = reverseKey ? (name1 + ":" + name2) : (name2 + ":" + name1);
-        String detailKey = tag + key;
-        Map<String, String> detail = readJsonFromRedis(detailKey);
-        if (detail != null) {
-            tagDesc.add(new DurDto(
-                    reverseKey ? (name2 + "+" + name1) : (name1 + "+" + name2),
-                    detail.getOrDefault("reason", ""),
-                    detail.getOrDefault("note", "")
-            ));
-        }
-    }
 
     // 반복하면서 방향 정보까지 넘겨줌
-    public void collectInteractionTags(String prodcutName, Set<String> others, String tag, boolean reverseKey, List<DurDto> tagDesc) throws JsonProcessingException {
+    public void collectInteractionTags(String productName, Set<String> others, String tag,List<DurDto> tagDesc) throws JsonProcessingException {
         for (String otherName : others) {
-            tryAddInteraction(otherName, tag, prodcutName, reverseKey, tagDesc);
+            String key = productName + ":" + otherName;
+            String detailKey = tag + key;
+            Map<String, String> detail = readJsonFromRedis(detailKey);
+            if (detail != null) {
+                tagDesc.add(new DurDto(
+                        productName + ":" + otherName,
+                        detail.getOrDefault("reason", ""),
+                        detail.getOrDefault("note", "")
+                ));
+            }
         }
     }
 
-    // 메인: 각각 방향 다르게 설정
-    public DurTagDto buildDrugSupplementContraTag(
-            String drugName,
+    public DurTagDto buildContraTag(
+            String name,
             Set<String> userInteractionDrugNames,
             Set<String> userInteractionSupplementNames,
             String tag1,
@@ -161,11 +198,8 @@ public class DurCheckService {
     ) throws JsonProcessingException {
         List<DurDto> tagDesc = new ArrayList<>();
 
-        // 건강기능식품 → drugName이 뒤에 (reverseKey = true)
-        collectInteractionTags(drugName, userInteractionSupplementNames, tag1, true, tagDesc);
-
-        // 약물 → drugName이 앞에 (reverseKey = false)
-        collectInteractionTags(drugName, userInteractionDrugNames, tag2, false, tagDesc);
+        collectInteractionTags(name, userInteractionDrugNames, tag1, tagDesc);
+        collectInteractionTags(name, userInteractionSupplementNames, tag2, tagDesc);
 
         return new DurTagDto("병용금기", tagDesc, !tagDesc.isEmpty());
     }

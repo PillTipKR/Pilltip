@@ -1,6 +1,7 @@
 package com.oauth2.Drug.Import.DURImport.Controller;
 
 import com.oauth2.Drug.Import.DURImport.Service.DrugCautionService;
+import com.oauth2.Drug.Import.DURImport.Service.DrugIngrInteractionService;
 import com.oauth2.Drug.Import.DURImport.Service.TherapeuticDupService;
 import com.oauth2.Drug.Import.DURImport.Service.DrugInteractionService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class DrugDurImportController {
     private final TherapeuticDupService drugTherapeuticDupService;
     private final DrugCautionService drugCautionService;
     private final DrugInteractionService drugInteractionService;
+    private final DrugIngrInteractionService drugIngrInteractionService;
     private final Logger logger = LoggerFactory.getLogger(DrugDurImportController.class);
 
     // txt 파일 업로드 & 파싱 실행
@@ -70,7 +72,7 @@ public class DrugDurImportController {
     @PostMapping("/interactionIng")
     public ResponseEntity<String> saveIngInteraction() {
         try {
-            drugInteractionService.loadIng();
+            drugIngrInteractionService.loadIng();
             return ResponseEntity.ok("주의 정보 저장 완료");
         } catch (Exception e) {
             logger.error("Error occurred in import interaction: {}", e.getMessage());

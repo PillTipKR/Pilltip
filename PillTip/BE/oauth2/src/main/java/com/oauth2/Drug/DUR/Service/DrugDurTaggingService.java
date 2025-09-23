@@ -1,6 +1,7 @@
 package com.oauth2.Drug.DUR.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import com.oauth2.Drug.DUR.Dto.DurUserContext;
 import com.oauth2.Drug.DUR.Dto.SearchDurDto;
@@ -32,7 +33,7 @@ public class DrugDurTaggingService {
         DurUserContext drugUserContext = durCheckService.buildUserContext(user);
         DurUserContext supplementUserContext = supplementDurCheckService.buildUserContext(user);
 
-        List<DurTagDto> tags = durCheckService.checkForDrugAndSupplement(drug, user.getUserProfile(), drugUserContext, supplementUserContext);
+        List<DurTagDto> tags = durCheckService.checkForInteractions(drug, DurType.DRUG,user.getUserProfile(), drugUserContext, supplementUserContext);
         tags = tags.stream().filter(DurTagDto::isTrue).toList();
         return tags.isEmpty();
     }
@@ -53,7 +54,7 @@ public class DrugDurTaggingService {
             Drug drug = drugMap.get(drugDto.id());
             if (drug == null) continue; // 약 정보를 찾을 수 없는 경우 건너뛰기
             Boolean isTaking = takingPills.contains(drugDto.id());
-            List<DurTagDto> tags = durCheckService.checkForDrugAndSupplement(drug, user.getUserProfile(), drugUserContext, supplementUserContext);
+            List<DurTagDto> tags = durCheckService.checkForInteractions(drug, DurType.DRUG,user.getUserProfile(), drugUserContext, supplementUserContext);
 
             result.add(new SearchDurDto(
                     drug.getId(),

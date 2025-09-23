@@ -14,10 +14,10 @@ import java.util.List;
 public class RetrieverConfig {
 
     private static final String SELECT_BASE = """
-    content
-    metadata
-    _additional { id score distance }
-""";
+        content
+        metadata
+        _additional { id score distance }
+    """;
 
     private final EmbeddingModel embeddingModel;
 

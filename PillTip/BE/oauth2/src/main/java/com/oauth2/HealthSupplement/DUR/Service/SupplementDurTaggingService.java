@@ -1,6 +1,7 @@
 package com.oauth2.HealthSupplement.DUR.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import com.oauth2.Drug.DUR.Dto.DurUserContext;
 import com.oauth2.Drug.DUR.Service.DurCheckService;
@@ -48,7 +49,7 @@ public class SupplementDurTaggingService {
             HealthSupplement healthSupplement = supplementMap.get(supplementDto.id());
             if (healthSupplement == null) continue; // 약 정보를 찾을 수 없는 경우 건너뛰기
             Boolean isTaking = takingSupplements.contains(supplementDto.id());
-            List<DurTagDto> tags = supplementDurCheckService.checkForSupplementAndDrug(healthSupplement, user.getUserProfile(), supplementUserContext, drugUserContext);
+            List<DurTagDto> tags = durCheckService.checkForInteractions(healthSupplement, DurType.SUPPLEMENT,user.getUserProfile(), supplementUserContext, drugUserContext);
 
             result.add(new SupplementSearchDurDto(
                     healthSupplement.getId(),

@@ -10,13 +10,13 @@ import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
-public class DurTools {
+public class DurTool {
 
 
     private final RagSearchService search;
 
     /** @Tool: 모델이 자동으로 호출할 메서드 */
-    @Tool(name = "DurRagTool", description = "성분/제품 상호작용(DUR) 근거 스니펫을 검색해줘.")
+    @Tool(name = "DurTool", description = "성분/제품 상호작용(DUR) 근거 스니펫을 검색해줘.")
     public Map<String,Object> run(
             @P("query") String query,
             @P("topK") Integer topK
