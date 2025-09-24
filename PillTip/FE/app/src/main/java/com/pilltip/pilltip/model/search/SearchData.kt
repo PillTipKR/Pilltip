@@ -681,3 +681,36 @@ data class ProfileData(
     val permissions: Boolean
 )
 
+/**
+ * AI Chatbot
+ */
+data class AgentRunRequest(
+    val userText: String,
+    val session: Int
+)
+
+/**
+ * 백엔드(WebFlux)가 전달하는 공통 이벤트 포맷을 탄력적으로 받기 위한 모델
+ * 서버가 보내는 필드가 일부 달라도 안전하게 파싱되도록 Optional 설정
+ *
+ * SSE 한 프레임의 data: ... 에 들어오는 JSON을 아래 DTO로 파싱.
+ */
+data class RawStreamEvent(
+    val type: String? = null,      // e.g., "status", "token", "final", "tool_result", "error", ...
+    val code: String? = null,      // e.g., "DUR_SEARCH_START", "ANSWER_DELTA", ...
+    val message: String? = null,   // 사람이 읽을 메시지
+    val data: String? = null,      // 델타 토큰이나 텍스트 조각
+    val meta: Map<String, Any>? = null,
+    val ts: Long? = null
+)
+
+/**
+ * UI 처리용 표준 이벤트
+ */
+sealed class AgentUiEvent {
+    data class Status(val code: String?, val message: String) : AgentUiEvent()
+    data class Token(val text: String) : AgentUiEvent()
+    data class Final(val text: String) : AgentUiEvent()
+    data class ToolResult(val code: String?, val payload: String?) : AgentUiEvent()
+    data class Error(val message: String) : AgentUiEvent()
+}

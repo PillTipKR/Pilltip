@@ -16,6 +16,7 @@ import androidx.navigation.navDeepLink
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.pilltip.pilltip.composable.MainComposable.BottomTab
 import com.pilltip.pilltip.composable.QuestionnaireComposable.QrScannerEntry
+import com.pilltip.pilltip.model.search.AgentChatViewModel
 import com.pilltip.pilltip.model.search.LogViewModel
 import com.pilltip.pilltip.model.search.ReviewViewModel
 import com.pilltip.pilltip.model.search.SearchHiltViewModel
@@ -36,6 +37,7 @@ import com.pilltip.pilltip.view.friend.ChildProfilePage
 import com.pilltip.pilltip.view.friend.ChildrenPage
 import com.pilltip.pilltip.view.friend.FriendAcceptPage
 import com.pilltip.pilltip.view.friend.FriendListPage
+import com.pilltip.pilltip.view.main.ChatbotPage
 import com.pilltip.pilltip.view.main.DURLoadingPage
 import com.pilltip.pilltip.view.main.DURPage
 import com.pilltip.pilltip.view.main.DURSearchPage
@@ -68,7 +70,8 @@ fun NavGraph(
     logViewModel: LogViewModel = viewModel(),
     sensitiveViewModel: SensitiveViewModel,
     reviewViewModel: ReviewViewModel,
-    userProfileViewModel: UserProfileViewModel
+    userProfileViewModel: UserProfileViewModel,
+    chatViewModel: AgentChatViewModel
 ) {
     val navController = rememberNavController()
     val myPageNavController = rememberNavController()
@@ -145,6 +148,10 @@ fun NavGraph(
 
         composable("ChildProfilePage") {
             ChildProfilePage(navController, userProfileViewModel, signUpViewModel)
+        }
+
+        composable("ChatbotPage") {
+            ChatbotPage(chatViewModel, navController)
         }
 
         /* Search */
