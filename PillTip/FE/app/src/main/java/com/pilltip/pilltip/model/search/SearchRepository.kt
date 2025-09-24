@@ -1,8 +1,20 @@
 package com.pilltip.pilltip.model.search
 
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
+import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.sse.EventSource
+import okhttp3.sse.EventSourceListener
+import okhttp3.sse.EventSources
 import retrofit2.Response
+import retrofit2.Retrofit
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -14,6 +26,8 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Url
 import javax.inject.Inject
+import javax.inject.Named
+import javax.inject.Singleton
 
 /**
  * 약품명 자동완성 API
@@ -689,6 +703,116 @@ class UserProfileRepositoryImpl @Inject constructor(
 
     override suspend fun createProfile(request: CreateProfileRequest): CreateProfileResponse {
         return api.createProfile(request)
+    }
+}
+
+/**
+ * AI Chatbot
+ */
+interface AgentChatRepository {
+    /**
+     * POST /api/agent/run 으로 SSE 스트림을 시작하고,
+     * 토큰/상태/최종 응답을 AgentUiEvent로 흘려준다.
+     */
+    fun runAgent(
+        userText: String,
+        session: Int = 1
+    ): Flow<AgentUiEvent>
+}
+
+@Singleton
+class AgentChatRepositoryImpl @Inject constructor(
+    @Named("SearchRetrofit") private val retrofit: Retrofit,
+    private val sseFactory: EventSource.Factory,
+    private val gson: Gson
+) : AgentChatRepository {
+
+    override fun runAgent(userText: String, session: Int): Flow<AgentUiEvent> = callbackFlow {
+        val url = retrofit.baseUrl().toString() + "/api/agent/run"
+        val json = gson.toJson(AgentRunRequest(userText, session))
+        val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
+
+        val request = Request.Builder()
+            .url(url)
+            // SSE 핵심
+            .header("Accept", "text/event-stream")
+            .header("Content-Type", "application/json")
+            // X-Profile-Id 는 네 Interceptor가 넣어주지만, 혹시 몰라 명시 가능
+            // .header("X-Profile-Id", "1")
+            .post(body)
+            .build()
+
+        val listener = object : EventSourceListener() {
+            override fun onOpen(eventSource: EventSource, response: okhttp3.Response) {
+                // 연결 성공
+            }
+
+            override fun onEvent(
+                eventSource: EventSource,
+                id: String?,
+                type: String?,
+                data: String
+            ) {
+                // SSE 프레임의 data: ... 부분이 data 인자로 들어온다.
+                // 1) 우선 JSON으로 파싱을 시도
+                val uiEvent = try {
+                    val parsed = gson.fromJson(data, RawStreamEvent::class.java)
+
+                    // 서버가 event 필드를 채워 보내면 OkHttp가 type 인자로 줌.
+                    // 그게 없다면 parsed.type을 보고 매핑.
+                    when ((type ?: parsed.type)?.lowercase()) {
+                        "status" -> {
+                            val msg = parsed.message ?: parsed.data ?: ""
+                            AgentUiEvent.Status(parsed.code, msg.ifEmpty { "상태 갱신" })
+                        }
+                        "token", "delta", "answer_delta", "chunk" -> {
+                            val token = parsed.data ?: parsed.message ?: ""
+                            AgentUiEvent.Token(token)
+                        }
+                        "final", "complete", "answer_final", "done" -> {
+                            val text = parsed.data ?: parsed.message ?: ""
+                            AgentUiEvent.Final(text)
+                        }
+                        "tool_result", "tool" -> {
+                            AgentUiEvent.ToolResult(parsed.code, parsed.data ?: parsed.message)
+                        }
+                        "error" -> {
+                            val msg = parsed.message ?: "알 수 없는 오류"
+                            AgentUiEvent.Error(msg)
+                        }
+                        else -> {
+                            // 타입이 없고, data가 그냥 텍스트일 수도 있다 → 델타로 처리
+                            val asObj = runCatching { gson.fromJson(data, JsonObject::class.java) }.getOrNull()
+                            val fallback = asObj?.get("data")?.asString ?: asObj?.get("message")?.asString ?: data
+                            AgentUiEvent.Token(fallback)
+                        }
+                    }
+                } catch (_: Throwable) {
+                    // data가 순수 텍스트면 그대로 델타로 취급
+                    AgentUiEvent.Token(data)
+                }
+
+                trySend(uiEvent)
+            }
+
+            override fun onClosed(eventSource: EventSource) {
+                close()
+            }
+
+            override fun onFailure(
+                eventSource: EventSource,
+                t: Throwable?,
+                response: okhttp3.Response?
+            ) {
+                trySend(AgentUiEvent.Error(t?.message ?: "SSE 연결 실패")).isSuccess
+                close(t)
+            }
+        }
+
+        val es = sseFactory.newEventSource(request, listener)
+        awaitClose {
+            es.cancel()
+        }
     }
 }
 
