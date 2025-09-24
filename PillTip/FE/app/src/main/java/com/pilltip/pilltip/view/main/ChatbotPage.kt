@@ -31,13 +31,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.pilltip.pilltip.composable.HeightSpacer
 import com.pilltip.pilltip.model.search.AgentChatViewModel
 import com.pilltip.pilltip.model.search.ChatRole
 
 @Composable
-fun AgentChatScreen(
-    viewModel: AgentChatViewModel
+fun ChatbotPage(
+    viewModel: AgentChatViewModel,
+    navController: NavController,
 ) {
     val messages by viewModel.messages.collectAsState()
     var input by remember { mutableStateOf("") }
