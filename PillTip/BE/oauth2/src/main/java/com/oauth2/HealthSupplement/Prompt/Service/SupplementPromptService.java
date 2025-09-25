@@ -1,9 +1,9 @@
 package com.oauth2.HealthSupplement.Prompt.Service;
 
+import com.oauth2.Drug.DUR.Dto.DurAnalysisResponse;
 import com.oauth2.Drug.DUR.Dto.DurDto;
 import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import com.oauth2.Drug.Prompt.Dto.*;
-import com.oauth2.HealthSupplement.DUR.Dto.SupplementDurAnalysisResponse;
 import com.oauth2.HealthSupplement.DetailPage.Dto.SupplementDetail;
 import com.oauth2.HealthSupplement.DetailPage.Dto.SupplementRequestInfoDto;
 import com.oauth2.HealthSupplement.Prompt.Dto.SupplementPromptRequestDto;
@@ -90,7 +90,7 @@ public class SupplementPromptService {
         return askGPT(prompt);
     }
 
-    public DurResponse askDur(SupplementDurAnalysisResponse durAnalysisResponse){
+    public DurResponse askDur(DurAnalysisResponse durAnalysisResponse){
         String prompt = buildCombinedDurPrompt(durAnalysisResponse);
         String gptResponse = askGPT(prompt); // OpenAI 응답 전체 텍스트
         DurExplanationResult result = parseCombinedResponse(gptResponse);
@@ -100,13 +100,13 @@ public class SupplementPromptService {
         String interactExplanation = result.interact();
 
         return new DurResponse(
-                durAnalysisResponse.durDrug().drugName(),
-                durAnalysisResponse.durSupplement().drugName(),
+                durAnalysisResponse.durA().drugName(),
+                durAnalysisResponse.durB().drugName(),
                 drugExplanation,
                 supplementExplanation,
                 interactExplanation,
-                !durAnalysisResponse.durDrug().durtags().isEmpty(),
-                !durAnalysisResponse.durSupplement().durtags().isEmpty(),
+                !durAnalysisResponse.durA().durtags().isEmpty(),
+                !durAnalysisResponse.durB().durtags().isEmpty(),
                 !durAnalysisResponse.interact().durtags().isEmpty()
         );
     }
@@ -139,29 +139,29 @@ public class SupplementPromptService {
         return response.getBody().getChoices().get(0).getMessage().getContent();
     }
 
-    private String buildCombinedDurPrompt(SupplementDurAnalysisResponse response) {
+    private String buildCombinedDurPrompt(DurAnalysisResponse response) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("아래는 한 사용자가 복용하려는 약-건강기능식품간 병용 조합에 대한 DUR 정보예요.\n\n");
 
         // 약물 A
-        sb.append("약:\n");
-        sb.append("- drugName: ").append(response.durDrug().drugName()).append("\n");
+        sb.append("약/건강기능식품:\n");
+        sb.append("- name: ").append(response.durA().drugName()).append("\n");
         sb.append("- durtags: ");
-        appendDurTagsExpanded(sb, response.durDrug().durtags());
-        sb.append("- isTakingOtherDrugs: ").append(response.userTaken()).append("\n\n");
+        appendDurTagsExpanded(sb, response.durA().durtags());
+        sb.append("- isTakingOther: ").append(response.userTaken()).append("\n\n");
 
         // 약물 B
-        sb.append("건강기능식품:\n");
-        sb.append("- supplementName: ").append(response.durSupplement().drugName()).append("\n");
+        sb.append("약/건강기능식품:\n");
+        sb.append("- name: ").append(response.durB().drugName()).append("\n");
         sb.append("- durtags: ");
-        appendDurTagsExpanded(sb, response.durSupplement().durtags());
-        sb.append("- isTakingOtherDrugs: ").append(response.userTaken()).append("\n\n");
+        appendDurTagsExpanded(sb, response.durB().durtags());
+        sb.append("- isTakingOther: ").append(response.userTaken()).append("\n\n");
 
         // 병용 DUR
         sb.append("병용 DUR:\n");
-        sb.append("- 조합: ").append(response.durDrug().drugName())
-                .append(" + ").append(response.durSupplement().drugName()).append("\n");
+        sb.append("- 조합: ").append(response.durA().drugName())
+                .append(" + ").append(response.durB().drugName()).append("\n");
         sb.append("- durtags: ");
         appendDurTagsExpanded(sb, response.interact().durtags());
         sb.append("\n");
@@ -175,7 +175,7 @@ public class SupplementPromptService {
                 .append("각 항목은 다음 지침을 따라 주세요:\n\n")
 
                 .append("1. 약-건강기능식품 설명:\n")
-                .append("- durtags가 비어 있고, isTakingOtherDrugs가 true인 경우: '지금 드시는 약들과는 특별한 상호작용이 없어요'를 넣으며 안심시키는 문장을 넣어 주세요.\n")
+                .append("- durtags가 비어 있고, isTakingOther가 true인 경우: '지금 드시는 약들과는 특별한 상호작용이 없어요'를 넣으며 안심시키는 문장을 넣어 주세요.\n")
                 .append("- durtags가 있을 경우: 모든 title 항목(예: 임부금기, 노인금기 등)을 하나도 빠짐없이 설명해 주세요.\n")
                 .append("  각 title 안의 reason, note를 자연스럽게 해요체 문단으로 풀어 주세요.\n\n")
 

@@ -1,8 +1,9 @@
 package com.oauth2.Drug.DUR.Controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DUR.Dto.DurAnalysisResponse;
-import com.oauth2.Drug.DUR.Service.DrugDurService;
+import com.oauth2.Drug.DUR.Service.DurService;
 import com.oauth2.Account.Service.AccountService;
 import com.oauth2.Account.Entity.Account;
 import com.oauth2.Account.Dto.ApiResponse;
@@ -19,7 +20,7 @@ import java.nio.file.AccessDeniedException;
 @RequestMapping("/api")
 public class DrugDurController {
 
-    private final DrugDurService drugDurService;
+    private final DurService durService;
     private final AccountService accountService;
 
     @GetMapping("/dur")
@@ -31,7 +32,7 @@ public class DrugDurController {
         User user = accountService.findUserByProfileId(profileId, account.getId());
 
         // 복약 완료 처리 로직
-        DurAnalysisResponse durAnalysisResponse = drugDurService.generateTagsForDrugs(user, drugId1, drugId2);
+        DurAnalysisResponse durAnalysisResponse = durService.generateTagsForDurEntities(user, drugId1, drugId2, DurType.DRUG, DurType.DRUG);
         return ResponseEntity.ok().body(ApiResponse.success(durAnalysisResponse));
     }
 }

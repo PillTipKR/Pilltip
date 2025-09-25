@@ -1,7 +1,9 @@
 package com.oauth2.HealthSupplement.Import.DURImport.Service;
 
-import com.oauth2.HealthSupplement.DUR.Entity.HealthSupplementCaution;
-import com.oauth2.HealthSupplement.DUR.Repository.HealthSupplementCautionRepository;
+import com.oauth2.Drug.DUR.Domain.ConditionType;
+import com.oauth2.Drug.DUR.Domain.DurType;
+import com.oauth2.Drug.DUR.Domain.SubjectCaution;
+import com.oauth2.Drug.DUR.Repository.SubjectCautionRepository;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
@@ -20,17 +22,17 @@ import java.util.List;
 public class HealthSupplementCautionService {
 
     private final HealthSupplementRepository healthSupplementRepository;
-    private final HealthSupplementCautionRepository healthSupplementCautionRepository;
+    private final SubjectCautionRepository subjectCautionRepository;
 
     @Value("${supplement.dur}")
     private String dur;
 
-    private HealthSupplementCaution.ConditionType convertConditionType(String type) {
+    private ConditionType convertConditionType(String type) {
         return switch (type.trim()) {
-            case "임신"     -> HealthSupplementCaution.ConditionType.PREGNANCY;
-            case "소아"     -> HealthSupplementCaution.ConditionType.AGE;
-            case "노인"     -> HealthSupplementCaution.ConditionType.ELDER;
-            case "수유"   -> HealthSupplementCaution.ConditionType.LACTATION;
+            case "임신"     -> ConditionType.PREGNANCY;
+            case "소아"     -> ConditionType.AGE;
+            case "노인"     -> ConditionType.ELDER;
+            case "수유"   -> ConditionType.LACTATION;
             default -> throw new IllegalArgumentException("지원되지 않는 유형: " + type);
         };
     }
@@ -63,15 +65,16 @@ public class HealthSupplementCautionService {
         }
     }
 
-    private void saveCaution(String rawMatrl, HealthSupplementCaution.ConditionType conditionTypeStr) {
+    private void saveCaution(String rawMatrl, ConditionType conditionTypeStr) {
 
         List<Long> supplements = healthSupplementRepository.findHealthSupplementsByRawMaterial(rawMatrl);
         for(Long id : supplements) {
-            if(healthSupplementCautionRepository.existsBySupplementIdAndConditionType(id,conditionTypeStr)) continue;
-            HealthSupplementCaution healthSupplementCaution = new HealthSupplementCaution();
-            healthSupplementCaution.setSupplementId(id);
-            healthSupplementCaution.setConditionType(conditionTypeStr);
-            healthSupplementCautionRepository.save(healthSupplementCaution);
+            if(subjectCautionRepository.existsBySubjectIdAndDurtypeAndConditionType(id, DurType.SUPPLEMENT, conditionTypeStr)) continue;
+            SubjectCaution subjectCaution = new SubjectCaution();
+            subjectCaution.setSubjectId(id);
+            subjectCaution.setDurtype(DurType.SUPPLEMENT);
+            subjectCaution.setConditionType(conditionTypeStr);
+            subjectCautionRepository.save(subjectCaution);
         }
     }
 }

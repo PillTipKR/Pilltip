@@ -1,5 +1,6 @@
 package com.oauth2.HealthSupplement.SupplementInfo.Entity;
 
+import com.oauth2.Drug.DUR.Domain.DurEntity;
 import com.oauth2.Drug.DrugInfo.Domain.DrugEffect;
 import com.oauth2.Drug.DrugInfo.Domain.DrugStorageCondition;
 import com.oauth2.Drug.Review.Domain.Review;
@@ -18,7 +19,7 @@ import java.util.Set;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class HealthSupplement {
+public class HealthSupplement implements DurEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -55,4 +56,15 @@ public class HealthSupplement {
 
     @OneToMany(mappedBy = "supplement", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SupplementReview> reviews = new ArrayList<>();
+
+    // getter, setter 생략
+    @Override
+    public Long getId(){
+        return id;
+    }
+
+    @Override
+    public String getName(){
+        return productName;
+    }
 }

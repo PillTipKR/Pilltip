@@ -1,5 +1,6 @@
 package com.oauth2.Drug.DrugInfo.Domain;
 
+import com.oauth2.Drug.DUR.Domain.DurEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,7 +9,7 @@ import lombok.Setter;
 @Setter
 @Entity
 @Table(name = "ingredients")
-public class Ingredient {
+public class Ingredient implements DurEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,4 +20,15 @@ public class Ingredient {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String nameEn;
     // getter, setter 생략
+
+    // getter, setter 생략
+    @Override
+    public Long getId(){
+        return id;
+    }
+
+    @Override
+    public String getName(){
+        return nameKr;
+    }
 } 
