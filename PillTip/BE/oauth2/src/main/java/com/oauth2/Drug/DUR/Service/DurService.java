@@ -52,8 +52,8 @@ public class DurService {
 
     public DurAnalysisResponse generateTagsForDurEntities(
             User user,
-            long entityId1,
-            long entityId2,
+            Long entityId1,
+            Long entityId2,
             DurType type1,
             DurType type2
     ) throws JsonProcessingException {
@@ -175,6 +175,15 @@ public class DurService {
         };
     }
 
+
+    public DurEntity getDurEntityByName(DurType type, String name) {
+        return switch (type) {
+            case DRUG -> drugRepository.findByName(name).orElse(null);  // Drug 객체 반환
+            case SUPPLEMENT -> healthSupplementRepository.findByProductName(name).orElse(null);  // HealthSupplement 객체 반환
+            case DRUGINGR -> ingredientRepository.findByNameKr(name).orElse(null);  // Ingredient 객체 반환
+            default -> null;  // 그 외는 null 반환
+        };
+    }
 
     private String removeParentheses(String text) {
         if (text == null) {

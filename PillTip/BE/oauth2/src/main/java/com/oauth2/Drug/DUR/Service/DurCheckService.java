@@ -51,7 +51,10 @@ public class DurCheckService {
     @Value("${redis.supplement.ingr.tag}")
     private String supplementIngrTag;
 
-    public List<DurTagDto> checkForWithoutInteraction(Long id, DurType durType, UserProfile userProfile, DurUserContext userContext) throws JsonProcessingException {
+    public List<DurTagDto> checkForWithoutInteraction(Long id,
+                                                      DurType durType,
+                                                      UserProfile userProfile,
+                                                      DurUserContext userContext) throws JsonProcessingException {
         List<DurTagDto> tags = new ArrayList<>();
         String key = "";
         switch(durType){
@@ -88,8 +91,12 @@ public class DurCheckService {
         return tags;
     }
 
-    public List<DurTagDto> checkForInteractions(DurEntity durEntity, DurType durType, UserProfile userProfile,
-                                                     DurUserContext drugUserContext, DurUserContext supplementUserContext) throws JsonProcessingException {
+    public List<DurTagDto> checkForInteractions(DurEntity durEntity,
+                                                DurType durType,
+                                                UserProfile userProfile,
+                                                DurUserContext drugUserContext,
+                                                DurUserContext supplementUserContext) throws JsonProcessingException {
+
         List<DurTagDto> tags = checkForWithoutInteraction(durEntity.getId(),durType,userProfile,drugUserContext);
         String name = durEntity.getName();
 

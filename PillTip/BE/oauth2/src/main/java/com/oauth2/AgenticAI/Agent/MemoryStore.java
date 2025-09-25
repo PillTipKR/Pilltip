@@ -2,7 +2,6 @@ package com.oauth2.AgenticAI.Agent;
 
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Component;
 
@@ -33,11 +32,11 @@ public class MemoryStore {
     public void appendUser(String session, String text) { addMessage(session, new UserMessage(text)); }
     public void appendAssistant(String session, String text) { addMessage(session, new AssistantMessage(text)); }
 
-    public void appendToolResult(String session, String toolName, String json) {
-        var toolResponse = new ToolResponseMessage.ToolResponse(
-                UUID.randomUUID().toString(), toolName, json
-        );
-        addMessage(session, new ToolResponseMessage(List.of(toolResponse)));
+    public void appendToolResult(String session, String userText, String output) {
+
+        String summary = session+"\n"+userText+"\n"+output;
+        Message summaryMessage = new AssistantMessage(summary);
+        addMessage(session, summaryMessage);
     }
 
     private void addMessage(String session, Message m) {

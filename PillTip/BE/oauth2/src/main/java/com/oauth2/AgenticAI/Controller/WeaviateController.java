@@ -1,7 +1,6 @@
 package com.oauth2.AgenticAI.Controller;
 
 import com.oauth2.AgenticAI.Dto.DoseInfo.DoseRow;
-import com.oauth2.AgenticAI.Dto.DurInfo.DurRuleRow;
 import com.oauth2.AgenticAI.Dto.ProductTool.ProductRow;
 import com.oauth2.AgenticAI.Service.RagIndexRouter;
 import com.oauth2.AgenticAI.Service.RagSearchService;
@@ -16,7 +15,7 @@ import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/index")
+@RequestMapping("/api/index")
 public class WeaviateController {
     private final RagIndexRouter index;
     private final RagSearchService ragSearchService;
@@ -58,9 +57,9 @@ public class WeaviateController {
     }
 
     @PostMapping("/dur")
-    public Map<String,Object> dur(@RequestBody DurRuleRow row){
-        index.upsertDur(row);
-        return Map.of("ok", true, "id", row.ruleId());
+    public String dur(){
+        index.batchDur();
+        return "OK";
     }
 
     @PostMapping("/dose")
@@ -83,8 +82,8 @@ public class WeaviateController {
             @RequestParam String q,
             @RequestParam(required = false) Integer k
     ) {
-        var hits = ragSearchService.searchDur(q, k);
-        return Map.of("count", hits.size(), "matches", hits);
+        List<Document> hits = ragSearchService.searchDur(q, k);
+        return index.toDurPayload(hits);
     }
 
     @GetMapping("/retrieve/dose")
@@ -94,6 +93,12 @@ public class WeaviateController {
     ) {
         var hits = ragSearchService.searchDose(q, k);
         return Map.of("count", hits.size(), "matches", hits);
+    }
+
+    @DeleteMapping("/delete")
+    public String deleteDoc(@RequestParam String docName){
+        index.deleteAllClassData(docName);
+        return "OK";
     }
 
 

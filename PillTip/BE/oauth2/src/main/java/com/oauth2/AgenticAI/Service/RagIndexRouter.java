@@ -3,9 +3,15 @@ package com.oauth2.AgenticAI.Service;
 import com.oauth2.AgenticAI.Dto.DoseInfo.DoseRow;
 import com.oauth2.AgenticAI.Dto.DurInfo.DurRuleRow;
 import com.oauth2.AgenticAI.Dto.ProductTool.ProductRow;
+import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DrugInfo.Domain.Drug;
 import com.oauth2.Drug.DrugInfo.Domain.DrugEffect;
+import com.oauth2.Drug.DrugInfo.Domain.Ingredient;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
+import com.oauth2.Drug.DrugInfo.Repository.IngredientRepository;
+import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
+import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
+import io.weaviate.client.WeaviateClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -26,14 +32,27 @@ public class RagIndexRouter {
 
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
     private final DrugRepository drugRepository;
+    private final HealthSupplementRepository supplementRepository;
+    private final IngredientRepository ingredientRepository;
+    private final WeaviateClient client;
 
     public void batchDrug(){
         List<Drug> drugs = drugRepository.findAll().stream()
                 .filter(t-> t.getTag().name().equals("COMMON")).toList();
         for(Drug d: drugs) {
             upsertProduct(buildDrugRow(d.getId()));
-            System.out.println(d.getId());
         }
+    }
+
+    public void batchDur(){
+        List<Drug> drugs = drugRepository.findAll();
+        List<HealthSupplement> healthSupplements = supplementRepository.findAll();
+        List<Ingredient> ingredients = ingredientRepository.findAll();
+        upsertDur(buildDurRow(113L,DurType.DRUGINGR));
+        for(Ingredient i : ingredients) upsertDur(buildDurRow(i.getId(), DurType.DRUGINGR));
+        for(Drug d: drugs) upsertDur(buildDurRow(d.getId(),DurType.DRUG));
+        for(HealthSupplement hs : healthSupplements) upsertDur(buildDurRow(hs.getId(),DurType.SUPPLEMENT));
+
     }
 
     public ProductRow buildDrugRow(Long id) {
@@ -58,6 +77,38 @@ public class RagIndexRouter {
                 )).orElse(null);
     }
 
+    public DurRuleRow buildDurRow(Long id, DurType durType){
+        switch (durType) {
+            case DRUG:
+                Drug drug = drugRepository.findById(id).orElse(null);
+                assert drug != null;
+                return new DurRuleRow(
+                        String.valueOf(drug.getId()),
+                        drug.getName(),
+                        durType.name()
+                );
+            case SUPPLEMENT:
+                HealthSupplement hs = supplementRepository.findById(id).orElse(null);
+                assert hs != null;
+                return new DurRuleRow(
+                        String.valueOf(hs.getId()),
+                        hs.getName(),
+                        durType.name()
+                );
+            case DRUGINGR:
+                Ingredient ingredient = ingredientRepository.findById(id).orElse(null);
+                assert ingredient != null;
+                return new DurRuleRow(
+                        String.valueOf(ingredient.getId()),
+                        ingredient.getName(),
+                        durType.name()
+                );
+            default:
+                return null;
+        }
+
+    }
+
     // 제품 인덱싱
     public void upsertProduct(ProductRow r) {
         String text = "%s(%s, %s). 분류: %s. 효능: %s"
@@ -78,18 +129,17 @@ public class RagIndexRouter {
 
     // DUR 인덱싱
     public void upsertDur(DurRuleRow r) {
-        String text = "[%s] %s + %s. 기전: %s. 조치: %s."
-                .formatted(nz(r.severity()).toUpperCase(), nvl(r.a()), nvl(r.b()),
-                        nz(r.mechanism()), nz(r.action()));
+        String text = "이름:%s. 타입:%s."
+                .formatted(nz(r.name()), r.durType());
 
         Map<String,Object> meta = new LinkedHashMap<>();
         put(meta, "ruleId", r.ruleId());
-        put(meta, "a", r.a());
-        put(meta, "b", r.b());
-        put(meta, "severity", r.severity());
+        put(meta, "name", r.name());
+        put(meta, "durType", r.durType());
 
-        add(durVS, "DUR:" + nvl(r.a()) + "+" + nvl(r.b()), text, "db:dur",
-                nvl(r.ruleId()), meta);
+        //System.out.println(text);
+        addAsSingleDocument(durVS, "이름:"+r.name(), text, "name",
+                r.ruleId(), meta);
     }
 
     // 용법/용량 인덱싱
@@ -104,6 +154,32 @@ public class RagIndexRouter {
         put(meta, "unit", r.unit());
 
         add(doseVS, nvl(r.title()), text, "db:dose", nvl(r.doseId()), meta);
+    }
+
+    public void deleteAllClassData(String className) {
+        client.schema().classDeleter()
+                .withClassName(className)
+                .run();
+    }
+
+    private void addAsSingleDocument(VectorStore vs, String title, String content, String source,
+                                     String docId, Map<String, Object> extraMeta) {
+
+        // 1. 메타데이터를 준비합니다. 이 부분은 기존과 동일합니다.
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("title", title);
+        metadata.put("source", source);
+        metadata.put("docId", docId);
+        if (extraMeta != null) {
+            metadata.putAll(extraMeta);
+        }
+
+        // 2. 청킹 로직을 모두 제거하고, 'content' 전체를 내용으로 하는 단일 Document 객체를 생성합니다.
+        Document singleDocument = new Document(content, metadata);
+
+        // 3. 단일 Document를 리스트에 담아 VectorStore에 추가합니다.
+        // VectorStore의 add 메소드는 List<Document>를 파라미터로 받기 때문입니다.
+        vs.add(List.of(singleDocument));
     }
 
     private void add(VectorStore vs, String title, String content, String source,
@@ -131,6 +207,7 @@ public class RagIndexRouter {
             meta.put("id", chunkId);
 
             // 권장 생성자: (content, metadata)
+            assert d.getText() != null;
             finalDocs.add(new Document(d.getText(), meta));
         }
 
@@ -164,7 +241,6 @@ public class RagIndexRouter {
 
     private List<String> splitByKRDelims(String content) {
         if (content == null) return List.of();
-        String text = content;
 
         Pattern DELIMS = Pattern.compile(
                 "(?:" +
@@ -176,7 +252,7 @@ public class RagIndexRouter {
                         ")"
         );
 
-        Matcher m = DELIMS.matcher(text);
+        Matcher m = DELIMS.matcher(content);
         List<String> out = new ArrayList<>();
         int start = 0;
 
@@ -189,13 +265,13 @@ public class RagIndexRouter {
             } else {                               // '요' (+옵션 구두점)
                 end = (m.group(4) != null) ? m.end(4) : m.end(3);
             }
-            String piece = text.substring(start, end).trim();
+            String piece = content.substring(start, end).trim();
             if (!piece.isBlank()) out.add(piece);
             start = m.end(); // 뒤 공백까지 소비 후 다음 시작
         }
 
-        if (start < text.length()) {
-            String tail = text.substring(start).trim();
+        if (start < content.length()) {
+            String tail = content.substring(start).trim();
             if (!tail.isBlank()) out.add(tail);
         }
         return out;
@@ -267,6 +343,59 @@ public class RagIndexRouter {
     private static String nvl(String s){ return (s == null) ? "" : s; }
     private String nz(String s){ return (s == null || s.isBlank()) ? "정보 없음" : s; }
 
+    public Map<String, Object> toDurPayload(List<Document> docs) {
+        // 1. 문서를 docId 기준으로 그룹화합니다. (청킹되지 않았지만, 일관성과 확장성을 위해 구조 유지)
+        Map<String, List<Document>> byDoc = new LinkedHashMap<>();
+        for (var d : docs) {
+            // docKey 헬퍼 메소드는 그대로 사용합니다.
+            byDoc.computeIfAbsent(docKey(d), k -> new ArrayList<>()).add(d);
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (var e : byDoc.entrySet()) {
+            var list = e.getValue();
+            if (list.isEmpty()) {
+                continue;
+            }
+
+            // 청킹되지 않은 문서이므로, 그룹의 첫 번째 문서가 모든 정보를 가집니다.
+            Document doc = list.get(0);
+
+            // 2. 점수(score)를 가져옵니다. toProductEffectPayload와 동일한 로직을 사용합니다.
+            double bestScore = Optional.ofNullable(doc.getMetadata().get("score"))
+                    .filter(Number.class::isInstance)
+                    .map(v -> ((Number) v).doubleValue())
+                    .orElse(0.0);
+
+            if (bestScore == 0.0) { // score가 없는 경우 distance로 대체 계산
+                bestScore = Optional.ofNullable(doc.getMetadata().get("distance"))
+                        .filter(Number.class::isInstance)
+                        .map(v -> 1.0 / (1.0 + ((Number) v).doubleValue()))
+                        .orElse(0.0);
+            }
+
+            // 3. 메타데이터에서 필요한 정보를 추출합니다.
+            String name = String.valueOf(doc.getMetadata().getOrDefault("name", ""));
+            String durType = String.valueOf(doc.getMetadata().getOrDefault("durType", ""));
+
+            // 4. 최종 결과를 구성합니다.
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("docId", e.getKey());
+            out.put("name", name);
+            // 'effect' 대신 문서의 전체 'text'를 'description'으로 제공
+            out.put("description", doc.getText());
+            out.put("durType", durType); // DUR 타입은 중요한 정보이므로 추가
+            out.put("score", round2(bestScore));
+            items.add(out);
+        }
+
+        // 5. 최종 결과를 점수(score) 기준으로 내림차순 정렬합니다.
+        items.sort(Comparator.<Map<String, Object>, Double>comparing(m -> ((Number) m.get("score")).doubleValue()).reversed());
+
+        // 6. toProductEffectPayload와 동일한 최종 포맷으로 래핑하여 반환합니다.
+        return Map.of("count", items.size(), "results", items);
+    }
+
     public Map<String,Object> toProductEffectPayload(List<Document> docs) {
         Map<String, List<Document>> byDoc = new LinkedHashMap<>();
         for (var d : docs) {
@@ -336,7 +465,7 @@ public class RagIndexRouter {
             int i = s.indexOf('#'); return (i > 0) ? s.substring(0, i) : s;
         }
         String id = d.getId();
-        if (id != null && !id.isBlank()) {
+        if (!id.isBlank()) {
             int i = id.indexOf('#'); return (i > 0) ? id.substring(0, i) : id;
         }
         return "";

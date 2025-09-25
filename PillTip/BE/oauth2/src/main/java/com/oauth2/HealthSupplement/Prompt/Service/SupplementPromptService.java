@@ -149,14 +149,14 @@ public class SupplementPromptService {
         sb.append("- name: ").append(response.durA().drugName()).append("\n");
         sb.append("- durtags: ");
         appendDurTagsExpanded(sb, response.durA().durtags());
-        sb.append("- isTakingOtherDrugs: ").append(response.userTaken()).append("\n\n");
+        sb.append("- isTakingOther: ").append(response.userTaken()).append("\n\n");
 
         // 약물 B
         sb.append("약/건강기능식품:\n");
         sb.append("- name: ").append(response.durB().drugName()).append("\n");
         sb.append("- durtags: ");
         appendDurTagsExpanded(sb, response.durB().durtags());
-        sb.append("- isTakingOtherDrugs: ").append(response.userTaken()).append("\n\n");
+        sb.append("- isTakingOther: ").append(response.userTaken()).append("\n\n");
 
         // 병용 DUR
         sb.append("병용 DUR:\n");
@@ -175,7 +175,7 @@ public class SupplementPromptService {
                 .append("각 항목은 다음 지침을 따라 주세요:\n\n")
 
                 .append("1. 약-건강기능식품 설명:\n")
-                .append("- durtags가 비어 있고, isTakingOtherDrugs가 true인 경우: '지금 드시는 약들과는 특별한 상호작용이 없어요'를 넣으며 안심시키는 문장을 넣어 주세요.\n")
+                .append("- durtags가 비어 있고, isTakingOther가 true인 경우: '지금 드시는 약들과는 특별한 상호작용이 없어요'를 넣으며 안심시키는 문장을 넣어 주세요.\n")
                 .append("- durtags가 있을 경우: 모든 title 항목(예: 임부금기, 노인금기 등)을 하나도 빠짐없이 설명해 주세요.\n")
                 .append("  각 title 안의 reason, note를 자연스럽게 해요체 문단으로 풀어 주세요.\n\n")
 

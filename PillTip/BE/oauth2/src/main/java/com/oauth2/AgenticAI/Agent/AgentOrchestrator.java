@@ -10,8 +10,12 @@ import com.oauth2.AgenticAI.Dto.ProductTool.FillteredDto;
 import com.oauth2.AgenticAI.Dto.ProductTool.ProductCandidate;
 import com.oauth2.AgenticAI.Tool.*;
 import com.oauth2.AgenticAI.Util.SessionUtils;
+import com.oauth2.Drug.DUR.Dto.DurAnalysisResponse;
+import com.oauth2.Drug.DUR.Dto.DurDto;
+import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
@@ -25,6 +29,8 @@ import org.springframework.ai.chat.model.StreamingChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.context.ContextView;
 
 import java.util.*;
 
@@ -53,9 +59,21 @@ public class AgentOrchestrator {
             - 증상을 설명하면 반드시 ProductRagTool 툴을 호출
             - 제품/추천 요청이면 반드시 ProductRagTool 툴 호출.
             - ProductRagTool 응답의 candidates를 DurFilterTool req.candidates로 그대로 전달.
-            - 약,약의 성분,건강기능식품,건강기능식품의 성분들 간의 상호작용 질문시, 제품 이름 혹은 성분 이름들을 미리 파싱해두고, 이를 DurTool에 전달
             - 필요한 값이 비면 AskUserTool로 1~2개만 짧게 되물음.
             - (중요) 이 단계에서는 '최종 답변 문장'을 쓰지 말 것. 가능한 한 툴 호출만 생성.
+            - [DurTool 규칙] 사용자가 두 개 이상의 약품/성분 간의 상호작용을 질문하면, 아래 '호출 예시'를 참고하여 문장에서 **핵심이 되는 이름 두 개를 추출**하고 `DurTool`을 호출해야 합니다.
+              - 파라미터 `name1`, `name2`는 **필수**입니다.
+              - 만약 이름이 하나만 있거나 불분명하면, Tool을 호출하기 전에 먼저 `AskUserTool`을 사용해 사용자에게 명확히 물어봐야 합니다.
+            
+              [호출 예시]
+              1. 사용자 입력: "타이레놀이랑 아스피린 같이 먹어도 괜찮아?"
+                 올바른 Tool 호출: DurTool(name1="타이레놀", name2="아스피린")
+            
+              2. 사용자 입력: "마그네슘하고 칼슘의 상호작용이 궁금해"
+                 올바른 Tool 호출: DurTool(name1="마그네슘", name2="칼슘")
+            
+              3. 사용자 입력: "제가 먹는 영양제랑 이 약을 같이 복용해도 될까요?"
+                 올바른 Tool 호출: AskUserTool(question="영양제와 약의 이름이 어떻게 되나요?")
             지원 범위:
             - 제품/성분 후보 찾기(ProductRagTool), DUR 상호작용/금기/주의 정보 알림(DurTool), 추가질문(AskUserTool)
             출력 스키마:
@@ -70,20 +88,39 @@ public class AgentOrchestrator {
     private static final String SYS_ANSWER_RECAP = """
             말투: 한국어 구어체 존댓말(~요).
             형식:
-              "찾아본 top-k(TOPK)개의 제품중 SAFE_COUNT개의 제품이 DUR체크를 통해 안전하게 필터링되었어요."
-              "NICK님에게 추천하는 제품들은 다음과 같아요."
+              "찾아본 top-k(TOPK)개의 제품중 SAFE_COUNT개의 제품이 NICK님의 정보를 바탕으로 진행한 DUR체크를 통해 안전하게 필터링되었어요."
+              "다음과 같은 제품들이 있었어요."
               SAFE_ITEMS들을 각각 컨텍스트만을 활용하여 문맥에 자연스럽고 친절하게 다듬어 소개
             원칙: 숫자/이름이 주어지면 그대로 사용, 없으면 해당 문장은 생략하고 간단 요약만 말할 것.
             """;
 
     private static final String SYS_ANSWER_DUR = """
-            말투: 한국어 구어체 존댓말(~요). 안전 우선, 신중한 톤.
-            형식:
-              ① DUR 결론(금기/주의/안전) 한줄
-              ② •상호작용 포인트 요약(원인·기전 간단히)
-              ③ 권장 행동(복용 간격/대체/의료상담)
-              ④ 필요 시 TOPK/SAFE_COUNT 한 줄로 첨언
-            원칙: 단정 대신 정도 표현, 근거 수준/불확실성 명시.
+            [출력 지시]
+            당신은 사용자의 건강을 염려하는 친절한 전문가입니다. 아래 지침에 따라, [DUR 정보]를 바탕으로 사용자에게 설명을 생성해 주세요.
+            
+            **[매우 중요한 규칙]**
+            - **답변은 오직 [DUR 정보] 섹션에 명시된 `name`인 '%s'와 '%s'만을 기반으로 생성해야 합니다.**
+            - **대화 기록에 이전에 언급된 다른 약물 이름(예: 아세트아미노펜, 와파린 등)은 절대 답변에 사용해서는 안 됩니다.**
+
+            1.  **어조 및 스타일**:
+                - 모든 설명은 부드러운 해요체(~요)로 작성하고, '~니다' 같은 딱딱한 표현은 사용하지 마세요.
+                - 전문 용어 대신, 환자가 쉽게 이해할 수 있는 단어로 풀어 설명해 주세요.
+                - 사용자가 약을 '복용하기 전' 상태임을 강조하며, '복용 전 확인해 주세요', '이런 점을 주의해야 해요' 등의 표현을 사용하세요.
+
+            2.  **내용 구성**:
+                - **첫 번째 문단**: 약 A(%s)에 대해 설명합니다. 문단은 반드시 '%s' 이름으로 시작해야 합니다.
+                  - `durtags`가 있다면, 각 `title`을 빠짐없이 언급하며 `reason`과 `note`를 종합해 자연스러운 문장으로 설명하세요.
+                  - `durtags`가 없다면, '복용 시 특별히 알려진 주의사항은 없어요' 와 같이 간단히 언급하세요.
+                - **두 번째 문단**: 약 B(%s)에 대해 설명합니다. 약 A와 같은 방식으로 '%s' 이름으로 시작하여 설명하세요.
+                - **세 번째 문단**: 두 성분의 '병용'에 대해서만 설명합니다.
+                  - 병용 `durtags`가 없다면, '두 가지를 함께 복용하는 것은 특별한 문제가 없어요' 와 같이 안심시키는 내용으로 작성하세요.
+                  - 병용 `durtags`가 있다면, 해당 내용을 바탕으로 왜 함께 복용하면 안 되는지, 또는 어떤 주의가 필요한지 부드럽게 설명하세요.
+                  - 이 문단에서는 오직 두 조합의 상호작용만 언급하고, 다른 약과의 관계는 절대 언급하지 마세요.
+
+            3.  **형식**:
+                - 절대 마크다운을 사용하지 마세요.
+                - 각 설명(약 A, 약 B, 병용)은 반드시 별개의 문단으로 명확히 구분해 주세요(줄바꿈 사용).
+                - 각 문단의 길이는 180자에서 200자 사이로 작성하도록 노력해 주세요.
             """;
 
     private static final String SYS_ANSWER_DOSE = """
@@ -109,7 +146,7 @@ public class AgentOrchestrator {
         if (sum != null && !sum.isBlank()) msgs.add(new SystemMessage("대화요약: " + sum));
         msgs.addAll(memory.recentTurns(session, 30));
         msgs.add(new UserMessage(userText == null ? "" : userText));
-
+        System.out.println("sum"+sum);
         // 2) 툴 콜백 + 자동실행 OFF (플래닝 전용 옵션: detectOpts)
         ToolCallback[] callbacks = ToolCallbacks.from(
                 askUserTool, doseInfoTool, productRagTool, durTool
@@ -119,19 +156,22 @@ public class AgentOrchestrator {
                 .parallelToolCalls(true)               // 동시 툴 계획 허용
                 .toolCallbacks(callbacks)
                 .build();
-
+        System.out.println("make detect");
         return Flux.defer(() -> {
             var head   = List.of(StreamEvent.status(EventCode.INTENT_DETECTED, "질문 의도를 파악했어요."));
             var events = new ArrayList<StreamEvent>(); // 단계별 상태 문구
 
             List<Message> history = new ArrayList<>(msgs);
+            System.out.println(history);
             ChatResponse resp = chatModel.call(new Prompt(history, detectOpts));
-
+            System.out.println("make resp");
             // DUR 결과 집계에 필요한 변수
             int topK = 0;
             int safeCount = 0;
             List<Map<String,Object>> safeItems = new ArrayList<>(); // [{id,name,effect,meta?}]
             Map<String, Map<String,Object>> candidateById = new HashMap<>();
+            DurAnalysisResponse durInfoJsonResponse = null;
+
             List<String> executedTools = new ArrayList<>();
 
             var planned = safePlannedToolNames(resp);
@@ -234,8 +274,41 @@ public class AgentOrchestrator {
                 if (!tmp.isEmpty()) safeItems = tmp;
 
                 events.add(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
-                history = new ArrayList<>(ragExec.conversationHistory());
 
+            }
+            if(planned.contains("DurTool")){
+                // --- 1. 제품 탐색 단계 ---
+                events.add(StreamEvent.status(EventCode.DUR_CHECK_START, "복용 상호작용(DUR)을 확인 중이에요."));
+
+                ToolExecutionResult durexec = null;
+                try {
+                    if (userId != null) SessionUtils.set(session, userId, nick);
+                    // ProductRagTool만 지정해서 실행
+                    durexec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
+                } catch(Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    SessionUtils.clear();
+                }
+
+                if (durexec == null) {
+                    // 에러 상황이므로 더 이상 진행하지 않고 Flux를 반환해야 할 수 있습니다.
+                    return Flux.just(StreamEvent.error(EventCode.BAD_REQUEST, "DurTool 실행에 실패했습니다."));
+                }
+
+                List<Message> his = new ArrayList<>(durexec.conversationHistory());
+                System.out.println(history);
+                Message lastMessage = his.get(his.size() - 1);
+                if (lastMessage instanceof ToolResponseMessage trm) {
+                    var conv = new BeanOutputConverter<>(DurAnalysisResponse.class);
+                    // conv.getFormat()을 프롬프트/툴 포맷 힌트로 넣고…
+                    assert trm.getText() != null;
+                    durInfoJsonResponse = conv.convert(trm.getResponses().get(0).responseData());
+
+                    executedTools.add("DurTool");
+
+                    events.add(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
+                }
             }
 
             // 3) 툴콜이 전혀 없던 케이스 → 거절/단답 처리
@@ -263,7 +336,7 @@ public class AgentOrchestrator {
                         .internalToolExecutionEnabled(false)
                         .streamUsage(true).build()
                 ));
-                String finalText = Optional.of(answer.getResult())
+                String finalText = Optional.ofNullable(answer.getResult())
                         .map(res -> res.getOutput().getText())
                         .orElse("");
 
@@ -284,7 +357,7 @@ public class AgentOrchestrator {
             // 모드 결정
             AnswerMode mode = pickMode(executedTools);
 
-            if (mode != AnswerMode.DOSE_INFO && (topK > 0 || safeCount > 0 || !safeItems.isEmpty())) {
+            if (mode == AnswerMode.RECAP && (topK > 0 || safeCount > 0 || !safeItems.isEmpty())) {
                 List<String> lines = new ArrayList<>();
                 int limit = Math.min(5, safeItems.size());
                 for (int i = 0; i < limit; i++) {
@@ -313,7 +386,20 @@ public class AgentOrchestrator {
                 """.formatted(topKOrSafe, safeCount, nick, safeListBlock);
 
                 followupMsgs.add(new SystemMessage(recap));
-                System.out.println(recap);
+            }
+
+            if (mode == AnswerMode.DUR_INFO) {
+                if(durInfoJsonResponse != null) {
+                    String template = createDurPrompt(durInfoJsonResponse);
+
+                    followupMsgs.add(new SystemMessage(template));
+                }else {
+                    String error = """
+                            dur 상호작용을 올바르게 찾아내지못하였습니다. 사용자에게 정중히 재입력을 요청해주세요.
+                            """;
+
+                    followupMsgs.add(new SystemMessage(error));
+                }
             }
 
             // 모드별 말투/형식 프롬프트 부착
@@ -331,21 +417,35 @@ public class AgentOrchestrator {
                             .build()
             );
 
+            // 👇 스트림 결과를 수집하여 메모리에 저장하는 로직 추가
+            StringBuilder finalAnswer = new StringBuilder();
+
             Flux<StreamEvent> stream = streamingChatModel.stream(followup)
-                    .map(r -> Optional.of(r.getResult())
+                    .map(r -> Optional.ofNullable(r.getResult())
                             .map(Generation::getOutput).map(AssistantMessage::getText).orElse(""))
                     .filter(s -> !s.isEmpty())
+                    .doOnNext(finalAnswer::append) // 스트리밍되는 각 조각을 StringBuilder에 추가합니다.
                     .map(StreamEvent::chunk)
                     .concatWithValues(StreamEvent.done())
-                    .onErrorResume(e -> Flux.just(StreamEvent.error(EventCode.STREAM_FAIL, e.getMessage())));
+                    .doOnComplete(() -> {
+                        // 스트림이 성공적으로 완료되면, 수집된 전체 답변을 메모리에 저장합니다.
+                        if (!finalAnswer.toString().isBlank()) {
+                            memory.appendToolResult(session, userText, String.valueOf(finalAnswer));
+                        }
+                    })
+                    .onErrorResume(e -> {
+                        // log.error("스트림 처리 중 에러 발생", e); // 에러 로깅을 추가하면 디버깅에 좋습니다.
+                        return Flux.just(StreamEvent.error(EventCode.STREAM_FAIL, e.getMessage()));
+                    });
 
             return Flux.concat(
                     Flux.fromIterable(head),
-                    Flux.fromIterable(events), // 상태 이벤트 먼저 쭉
+                    events.stream().map(Flux::just).reduce(Flux.empty(), Flux::concat),
                     Flux.just(StreamEvent.status(EventCode.TOOL_START, "도구 실행을 마쳤어요. 답변을 정리할게요.")),
                     stream
             );
-        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic())
+        .contextCapture();
     }
 
     private static List<Map<String, Object>> getMaps(DurFilterResult dr) {
@@ -442,5 +542,74 @@ public class AgentOrchestrator {
             // 예외 발생 시 null 반환
             return null;
         }
+    }
+
+    public String createDurPrompt(DurAnalysisResponse response) {
+        // durtag 정보를 LLM이 이해하기 쉬운 문자열 형태로 변환합니다.
+        String durA_tags = formatDurtagsForPrompt(response.durA().durtags());
+        String durB_tags = formatDurtagsForPrompt(response.durB().durtags());
+        String interaction_tags = formatDurtagsForPrompt(response.interact().durtags());
+
+        // 최종 프롬프트 템플릿
+        String promptTemplate = """
+            [컨텍스트]
+            사용자는 아직 어떤 약이나 건강기능식품도 복용하고 있지 않습니다.
+            사용자는 두 가지 성분을 함께 복용하기 전, 안전성에 대한 정보를 확인하고 싶어합니다.
+            따라서, 사용자의 입장에서 복용 전 알아야 할 주의사항을 친절하고 이해하기 쉽게 설명해야 합니다.
+            '복용 중인', '드시고 계신' 등의 표현은 절대 사용하면 안 됩니다.
+
+            [DUR 정보]
+            - 약/건강기능식품 A:
+              - name: %s
+              - durtags:
+            %s
+
+            - 약/건강기능식품 B:
+              - name: %s
+              - durtags:
+            %s
+
+            - 병용 DUR (A + B):
+              - name: %s
+              - durtags:
+            %s
+            """;
+
+        return promptTemplate.formatted(
+                response.durA().drugName(),
+                durA_tags,
+                response.durB().drugName(),
+                durB_tags,
+                response.interact().drugName(),
+                interaction_tags
+        );
+    }
+
+    /**
+     * DurTag 리스트를 LLM 프롬프트에 삽입하기 좋은 형태의 문자열로 변환하는 헬퍼 메소드입니다.
+     * @param durtags 변환할 DurTag 리스트
+     * @return YAML과 유사한 형식의 문자열
+     */
+    private String formatDurtagsForPrompt(List<DurTagDto> durtags) {
+        StringBuilder sb = new StringBuilder();
+        if (durtags == null || durtags.isEmpty()) {
+            sb.append("[]\n");
+            return "";
+        }
+        sb.append("[\n");
+        for (DurTagDto tag : durtags) {
+            sb.append("  {\n");
+            sb.append("    title: ").append(tag.title()).append(",\n");
+            sb.append("    durDtos: [\n");
+            for (DurDto dto : tag.durDtos()) {
+                sb.append("      { name: ").append(dto.name())
+                        .append(", reason: ").append(dto.reason())
+                        .append(", note: ").append(dto.note()).append(" },\n");
+            }
+            sb.append("    ]\n");
+            sb.append("  },\n");
+        }
+        sb.append("]\n");
+        return sb.toString();
     }
 }

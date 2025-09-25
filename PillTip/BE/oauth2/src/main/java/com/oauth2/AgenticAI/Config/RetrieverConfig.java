@@ -32,21 +32,22 @@ public class RetrieverConfig {
                 List.of("content"),                    // 텍스트 필드 후보
                 SELECT_BASE,                 // 선택 필드
                 where,                       // where 절(옵션)
-                0.6,                          // alpha
+                0.5,                          // alpha
                 embeddingModel
         );
     }
 
     @Bean("durRetriever")
     public WeaviateHybridRetriever durRetriever(WeaviateClient client) {
+        String where = null; // 예: "where: { path: [\"source\"], operator: Equal, valueText: \"effect\" }"
         return new WeaviateHybridRetriever(
                 client,
-                "DurDoc",
+                "DurRule",
                 List.of("content"),
                 List.of("content"),
                 SELECT_BASE,
-                null,
-                0.6,
+                where,
+                0.3,
                 embeddingModel
         );
     }

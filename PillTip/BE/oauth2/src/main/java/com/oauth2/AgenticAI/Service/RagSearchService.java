@@ -21,7 +21,7 @@ public class RagSearchService {
     @Qualifier("doseRetriever")    private final DocumentRetriever doseRetriever;
 
     // Service
-    public List<Document> searchProduct(String q, Integer k) {
+    public List<Document> search(String q, Integer k, DocumentRetriever retriever) {
         Map<String,Object> ctx = new LinkedHashMap<>();
         if (k != null && k > 0) ctx.put("topK", k);
         // 원하면 메타 필터도 같이
@@ -32,23 +32,19 @@ public class RagSearchService {
                 .context(ctx)
                 .build();
 
-        return productRetriever.retrieve(query);
-    }
-
-    public List<Document> searchDur(String q, Integer k) {
-        Map<String,Object> ctx = new LinkedHashMap<>();
-        if (k != null && k > 0) ctx.put("topK", k);
-        // ctx.put("filter", Map.of("source","db:dur"));
-        Query query = Query.builder().text(q).context(ctx).build();
-        return durRetriever.retrieve(query);
+        return retriever.retrieve(query);
     }
 
     public List<Document> searchDose(String q, Integer k) {
-        Map<String,Object> ctx = new LinkedHashMap<>();
-        if (k != null && k > 0) ctx.put("topK", k);
-        // ctx.put("filter", Map.of("source","db:dose"));
-        Query query = Query.builder().text(q).context(ctx).build();
-        return doseRetriever.retrieve(query);
+        return search(q,k,doseRetriever);
+    }
+
+    public List<Document> searchDur(String q, Integer k) {
+        return search(q,k,durRetriever);
+    }
+
+    public List<Document> searchProduct(String q, Integer k) {
+        return search(q,k,productRetriever);
     }
 
 }
