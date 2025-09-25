@@ -428,7 +428,6 @@ public class AgentOrchestrator {
                     .map(StreamEvent::chunk)
                     .concatWithValues(StreamEvent.done())
                     .doOnComplete(() -> {
-                        // 스트림이 성공적으로 완료되면, 수집된 전체 답변을 메모리에 저장합니다.
                         if (!finalAnswer.toString().isBlank()) {
                             memory.appendToolResult(session, userText, String.valueOf(finalAnswer));
                         }
