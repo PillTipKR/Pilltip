@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -197,7 +198,16 @@ fun HomePage(
     val inviteUrl by searchHiltViewModel.inviteUrl.collectAsState()
     var link by remember { mutableStateOf("") }
     var nickname = UserInfoManager.getUserData(context)?.nickname
-
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomEnd
+    ){
+        Column(
+            modifier = Modifier.clip(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)).noRippleClickable { navController.navigate("ChatbotPage") }
+        ){
+            Text("챗봇")
+        }
+    }
     SideEffect {
         systemUiController.setStatusBarColor(
             color = Color(0xFFF1F6FE),
