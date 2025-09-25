@@ -25,4 +25,5 @@ public interface HealthSupplementRepository extends JpaRepository<HealthSuppleme
             "WHERE si.id = :id")
     Optional<HealthSupplement> findSuppelmentWithAllRelations(@Param("id") long id);
 
+    Optional<HealthSupplement> findByProductName(String name);
 }

@@ -1,8 +1,9 @@
 package com.oauth2.HealthSupplement.Import.DURImport.Service;
 
+import com.oauth2.Drug.DUR.Domain.DurType;
+import com.oauth2.Drug.DUR.Domain.SubjectInteraction;
+import com.oauth2.Drug.DUR.Repository.SubjectInteractionRepository;
 import com.oauth2.Drug.DrugInfo.Repository.DrugIngredientRepository;
-import com.oauth2.HealthSupplement.DUR.Entity.HealthSupplementInteraction;
-import com.oauth2.HealthSupplement.DUR.Repository.SupplementInteractionRepository;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
@@ -22,7 +23,7 @@ public class SupplementInteractionService {
 
     private final HealthSupplementRepository healthSupplementRepository;
     private final DrugIngredientRepository drugIngredientRepository;
-    private final SupplementInteractionRepository interactionRepository;
+    private final SubjectInteractionRepository subjectInteractionRepository;
 
     @Value("${supplement.interaction}")
     private String interaction;
@@ -55,7 +56,7 @@ public class SupplementInteractionService {
 
                 for(Long supId : supplementIds){
                     for(Long drugId : drugIds){
-                        if(!interactionRepository.findBySupplementIdAndDrugId(supId, drugId).isEmpty()) continue;
+                        if(!subjectInteractionRepository.findBySubjectId1AndDurtype1AndSubjectId2AndDurtype2(drugId,DurType.DRUG, supId, DurType.SUPPLEMENT).isEmpty()) continue;
                         saveInteraction(supId,drugId,reason,note);
                     }
                 }
@@ -65,17 +66,14 @@ public class SupplementInteractionService {
 
 
     private void saveInteraction(Long supId, Long drugId, String reason, String note) {
-        HealthSupplementInteraction interaction = new HealthSupplementInteraction();
-        interaction.setSupplementId(supId);
-        interaction.setDrugId(drugId);
+        SubjectInteraction interaction = new SubjectInteraction();
+        interaction.setSubjectId1(drugId);
+        interaction.setSubjectId2(supId);
+        interaction.setDurtype1(DurType.DRUG);
+        interaction.setDurtype2(DurType.SUPPLEMENT);
         interaction.setReason(reason);
         interaction.setNote(note);
-
-        save(interaction);
+        subjectInteractionRepository.save(interaction);
     }
 
-
-    private void save(HealthSupplementInteraction interaction) {
-        interactionRepository.save(interaction);
-    }
 }

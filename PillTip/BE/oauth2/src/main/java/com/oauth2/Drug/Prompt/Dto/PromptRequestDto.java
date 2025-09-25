@@ -15,6 +15,7 @@ public record PromptRequestDto(
         String underlyingDisease, // 기저질환 (예: "고혈압", 없으면
         String allegy,
         List<String> currentDrugs, // 현재 복약 중인 약들
+        List<String> currentSupplements, // 현재 복약 중인 건강기능식품
         DrugRequestInfoDto drugInfo        // 약물 요약 정보 (예: "스피드펜연질캡슐200밀리그램(이부프로펜)")
 ){}
 

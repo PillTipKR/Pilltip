@@ -6,6 +6,8 @@ import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import com.oauth2.Drug.DetailPage.Dto.*;
 import com.oauth2.Drug.Prompt.Dto.*;
 import com.oauth2.User.TakingPill.Dto.TakingPillSummaryResponse;
+import com.oauth2.User.TakingSupplement.Dto.TakingSupplementSummaryResponse;
+import com.oauth2.User.TakingSupplement.Service.TakingSupplementService;
 import com.oauth2.User.UserInfo.Entity.User;
 import com.oauth2.User.TakingPill.Service.TakingPillService;
 import com.oauth2.User.UserInfo.Dto.UserSensitiveInfoDto;
@@ -39,12 +41,16 @@ public class DrugPromptService {
     private String model;
 
     private final TakingPillService takingPillService;
+    private final TakingSupplementService takingSupplementService;
     private final UserSensitiveInfoService userSensitiveInfoService;
 
 
     private PromptRequestDto buildPromptRequestDto(User user, DrugDetail detail) {
         List<String> medicationNames = takingPillService.getTakingPillSummary(user).getTakingPills().stream()
                 .map(TakingPillSummaryResponse.TakingPillSummary::getMedicationName)
+                .toList();
+        List<String> supplementNames = takingSupplementService.getTakingSupplementSummary(user).getTakingSupplements().stream()
+                .map(TakingSupplementSummaryResponse.TakingSupplementSummary::getSupplementName)
                 .toList();
         List<DurTagDto> trueTags = detail.durTags().stream()
                 .filter(DurTagDto::isTrue)
@@ -66,6 +72,7 @@ public class DrugPromptService {
                 chronicDiseaseInfo,
                 allergyInfo,
                 medicationNames,
+                supplementNames,
                 new DrugRequestInfoDto(
                         detail.name(),
                         detail.effect(),
@@ -246,7 +253,8 @@ public class DrugPromptService {
                 .append("성별 : ").append(dto.gender()).append("\n")
                 .append("임신 여부 : ").append(dto.isPregnant()).append("\n")
                 .append("알러지 : ").append(dto.allegy()).append("\n")
-                .append("기저질환 : ").append(dto.underlyingDisease()).append("\n {");
+                .append("기저질환 : ").append(dto.underlyingDisease()).append("\n")
+                .append("복용중인 약 : {");
 
         if (dto.currentDrugs() != null && !dto.currentDrugs().isEmpty()) {
             String drugList = dto.currentDrugs().stream()
@@ -254,7 +262,16 @@ public class DrugPromptService {
                     .collect(Collectors.joining(", "));
             sb.append(drugList);
         }
-        sb.append("} } \n");
+        sb.append("}\n");
+        sb.append("복용중인 건강기능식품 : {");
+
+        if (dto.currentSupplements() != null && !dto.currentSupplements().isEmpty()) {
+            String supplementList = dto.currentSupplements().stream()
+                    .map(d -> "\"" + d + "\"")
+                    .collect(Collectors.joining(", "));
+            sb.append(supplementList);
+        }
+        sb.append("} }\n");
 
         // 약 정보
         sb.append("약 정보: { ").append(dto.drugInfo()).append(" }\n\n");

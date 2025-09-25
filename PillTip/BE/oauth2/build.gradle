@@ -17,7 +17,7 @@ configurations {
 	compileOnly {
 		extendsFrom annotationProcessor
 	}
-    configureEach {
+	configureEach {
 		exclude group: 'commons-logging', module: 'commons-logging'
 	}
 }
@@ -32,13 +32,23 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-json'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation("org.springframework.boot:spring-boot-starter-webflux")
+	implementation 'org.springframework.boot:spring-boot-starter-web-services'
+
 	implementation 'com.opencsv:opencsv:5.8'
 	implementation 'org.apache.poi:poi:5.2.3'
 	implementation 'org.apache.poi:poi-ooxml:5.2.3'
 	implementation 'org.apache.commons:commons-csv:1.10.0'
-	implementation 'org.springframework.boot:spring-boot-starter-web-services'
+
 	implementation("com.google.firebase:firebase-admin:9.5.0")
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	implementation platform('org.springframework.ai:spring-ai-bom:1.0.1')
+	implementation 'org.springframework.ai:spring-ai-openai'
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+	implementation 'org.springframework.ai:spring-ai-weaviate-store'
+	implementation 'org.springframework.ai:spring-ai-rag'
+	implementation 'org.springframework.ai:spring-ai-starter-model-transformers'
 
 	implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
 	implementation 'co.elastic.clients:elasticsearch-java:8.11.1'

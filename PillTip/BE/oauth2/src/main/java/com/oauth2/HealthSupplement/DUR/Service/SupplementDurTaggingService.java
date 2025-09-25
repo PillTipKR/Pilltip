@@ -1,6 +1,7 @@
 package com.oauth2.HealthSupplement.DUR.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DUR.Dto.DurTagDto;
 import com.oauth2.Drug.DUR.Dto.DurUserContext;
 import com.oauth2.Drug.DUR.Service.DurCheckService;
@@ -8,8 +9,8 @@ import com.oauth2.HealthSupplement.DUR.Dto.SupplementSearchDurDto;
 import com.oauth2.HealthSupplement.Search.Dto.SupplementSearchIndexDto;
 import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
-import com.oauth2.User.TakingPill.Entity.TakingPill;
-import com.oauth2.User.TakingPill.Repositoty.TakingPillRepository;
+import com.oauth2.User.TakingSupplement.Entity.TakingSupplement;
+import com.oauth2.User.TakingSupplement.Repository.TakingSupplementRepository;
 import com.oauth2.User.UserInfo.Entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ public class SupplementDurTaggingService {
     private final HealthSupplementRepository healthSupplementRepository;
     private final SupplementDurCheckService supplementDurCheckService;
     private final DurCheckService durCheckService;
-    private final TakingPillRepository takingPillRepository;
+    private final TakingSupplementRepository takingSupplementRepository;
 
     public List<SupplementSearchDurDto> generateTagsForSupplements(User user, List<SupplementSearchIndexDto> supplements) throws JsonProcessingException {
 
@@ -40,15 +41,15 @@ public class SupplementDurTaggingService {
                 .collect(Collectors.toMap(HealthSupplement::getId, hs->hs));
 
         // 건기식 정보로 수정하기
-        List<Long> takingPills = takingPillRepository.findByUser(user).stream()
-                .map(TakingPill::getId).toList();
+        List<Long> takingSupplements = takingSupplementRepository.findByUser(user).stream()
+                .map(TakingSupplement::getId).toList();
 
         List<SupplementSearchDurDto> result = new ArrayList<>();
         for (SupplementSearchIndexDto supplementDto : supplements) {
             HealthSupplement healthSupplement = supplementMap.get(supplementDto.id());
             if (healthSupplement == null) continue; // 약 정보를 찾을 수 없는 경우 건너뛰기
-            Boolean isTaking = takingPills.contains(supplementDto.id());
-            List<DurTagDto> tags = supplementDurCheckService.checkForSupplementAndDrug(healthSupplement, user.getUserProfile(), supplementUserContext, drugUserContext);
+            Boolean isTaking = takingSupplements.contains(supplementDto.id());
+            List<DurTagDto> tags = durCheckService.checkForInteractions(healthSupplement, DurType.SUPPLEMENT,user.getUserProfile(), supplementUserContext, drugUserContext);
 
             result.add(new SupplementSearchDurDto(
                     healthSupplement.getId(),

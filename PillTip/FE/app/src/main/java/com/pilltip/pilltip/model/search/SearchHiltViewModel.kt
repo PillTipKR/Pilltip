@@ -21,6 +21,8 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
@@ -29,6 +31,8 @@ import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.sse.EventSource
+import okhttp3.sse.EventSources
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
@@ -966,6 +970,96 @@ class UserProfileViewModel @Inject constructor(
     }
 }
 
+/* Chat bot */
+enum class ChatRole { User, Assistant, System }
+
+data class ChatMessage(
+    val id: String,
+    val role: ChatRole,
+    val text: String,
+    val streaming: Boolean = false
+)
+
+@HiltViewModel
+class AgentChatViewModel @Inject constructor(
+    private val agentRepo: AgentChatRepository
+) : ViewModel() {
+
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val messages: StateFlow<List<ChatMessage>> = _messages
+
+    private var currentAssistantId: String? = null
+
+    fun send(userText: String, session: Int = 1) {
+        // 1) 사용자 메시지 추가
+        val userMsg = ChatMessage(
+            id = "user-${System.nanoTime()}",
+            role = ChatRole.User,
+            text = userText
+        )
+        // 2) 비어 있는 Assistant 버블(스트리밍용) 추가
+        val assistantId = "assistant-${System.nanoTime()}"
+        currentAssistantId = assistantId
+        val assistantMsg = ChatMessage(
+            id = assistantId,
+            role = ChatRole.Assistant,
+            text = "",
+            streaming = true
+        )
+        _messages.value = _messages.value + listOf(userMsg, assistantMsg)
+
+        // 3) SSE 스트림 시작
+        agentRepo.runAgent(userText, session).onEach { ev ->
+            when (ev) {
+                is AgentUiEvent.Status -> {
+                    appendSystem("${ev.code ?: "STATUS"} • ${ev.message}")
+                }
+                is AgentUiEvent.Token -> {
+                    appendToAssistant(ev.text)
+                }
+                is AgentUiEvent.Final -> {
+                    appendToAssistant(ev.text)
+                    finalizeAssistant()
+                }
+                is AgentUiEvent.ToolResult -> {
+                    appendSystem("툴 실행 결과: ${ev.code ?: ""} ${ev.payload ?: ""}".trim())
+                }
+                is AgentUiEvent.Error -> {
+                    appendSystem("에러: ${ev.message}")
+                    finalizeAssistant()
+                }
+            }
+        }.launchIn(viewModelScope)
+    }
+
+    private fun appendToAssistant(delta: String) {
+        val id = currentAssistantId ?: return
+        val updated = _messages.value.map {
+            if (it.id == id) it.copy(text = it.text + delta) else it
+        }
+        _messages.value = updated
+    }
+
+    private fun finalizeAssistant() {
+        val id = currentAssistantId ?: return
+        val updated = _messages.value.map {
+            if (it.id == id) it.copy(streaming = false) else it
+        }
+        _messages.value = updated
+        currentAssistantId = null
+    }
+
+    private fun appendSystem(text: String) {
+        val sys = ChatMessage(
+            id = "sys-${System.nanoTime()}",
+            role = ChatRole.System,
+            text = text,
+            streaming = false
+        )
+        _messages.value = _messages.value + sys
+    }
+}
+
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -1217,5 +1311,23 @@ object RepositoryModule {
     ): UserProfileRepository {
         return UserProfileRepositoryImpl(api)
     }
+
+    /* Chat bot */
+    @Provides
+    @Singleton
+    fun provideGson(): Gson = Gson()
+
+    @Provides
+    @Singleton
+    fun provideSseFactory(okHttpClient: OkHttpClient): EventSource.Factory =
+        EventSources.createFactory(okHttpClient)
+
+    @Provides
+    @Singleton
+    fun provideAgentChatRepository(
+        @Named("SearchRetrofit") retrofit: Retrofit,
+        sseFactory: EventSource.Factory,
+        gson: Gson
+    ): AgentChatRepository = AgentChatRepositoryImpl(retrofit, sseFactory, gson)
 
 }

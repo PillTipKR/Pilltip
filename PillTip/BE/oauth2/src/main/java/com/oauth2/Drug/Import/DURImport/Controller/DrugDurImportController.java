@@ -1,8 +1,6 @@
 package com.oauth2.Drug.Import.DURImport.Controller;
 
-import com.oauth2.Drug.Import.DURImport.Service.DrugCautionService;
-import com.oauth2.Drug.Import.DURImport.Service.TherapeuticDupService;
-import com.oauth2.Drug.Import.DURImport.Service.DrugInteractionService;
+import com.oauth2.Drug.Import.DURImport.Service.*;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +17,8 @@ public class DrugDurImportController {
     private final TherapeuticDupService drugTherapeuticDupService;
     private final DrugCautionService drugCautionService;
     private final DrugInteractionService drugInteractionService;
+    private final DrugIngrInteractionService drugIngrInteractionService;
+    private final DrugIngrCautionService drugIngrCautionService;
     private final Logger logger = LoggerFactory.getLogger(DrugDurImportController.class);
 
     // txt 파일 업로드 & 파싱 실행
@@ -37,6 +37,8 @@ public class DrugDurImportController {
     public ResponseEntity<String> importCautionFromPath() {
         try {
             drugCautionService.parseIngrAll();
+            drugIngrCautionService.parseIngrAll();
+            drugCautionService.parseAllAndSave();
             return ResponseEntity.ok("주의 정보 저장 완료");
         } catch (Exception e) {
             logger.error("Error occurred in import caution: {}", e.getMessage());
@@ -66,10 +68,22 @@ public class DrugDurImportController {
         }
     }
 
+    @PostMapping("/interaction/all")
+    public ResponseEntity<String> saveInteractionAll() {
+        try {
+            drugInteractionService.loadAll();
+            drugIngrInteractionService.loadIng();
+            return ResponseEntity.ok("주의 정보 저장 완료");
+        } catch (Exception e) {
+            logger.error("Error occurred in import interaction: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/interactionIng")
     public ResponseEntity<String> saveIngInteraction() {
         try {
-            drugInteractionService.loadIng();
+            drugIngrInteractionService.loadIng();
             return ResponseEntity.ok("주의 정보 저장 완료");
         } catch (Exception e) {
             logger.error("Error occurred in import interaction: {}", e.getMessage());
