@@ -32,7 +32,7 @@ public class RetrieverConfig {
                 List.of("content"),                    // 텍스트 필드 후보
                 SELECT_BASE,                 // 선택 필드
                 where,                       // where 절(옵션)
-                0.5,                          // alpha
+                0.5,                          // alpha: 0에 가까울수록 키워드 검색 비중 높음.
                 embeddingModel
         );
     }
@@ -61,7 +61,7 @@ public class RetrieverConfig {
                 List.of("content"),
                 SELECT_BASE,
                 null,
-                0.6,
+                0.4,
                 embeddingModel
         );
     }

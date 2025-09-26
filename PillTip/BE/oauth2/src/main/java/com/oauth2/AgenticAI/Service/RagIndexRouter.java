@@ -13,12 +13,20 @@ import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
 import io.weaviate.client.WeaviateClient;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,6 +37,9 @@ public class RagIndexRouter {
     @Qualifier("productVS") private final VectorStore productVS;
     @Qualifier("durVS") private final VectorStore durVS;
     @Qualifier("doseVS") private final VectorStore doseVS;
+
+    @Value("${supplement.intake}")
+    private String intakeName;
 
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
     private final DrugRepository drugRepository;
@@ -54,6 +65,15 @@ public class RagIndexRouter {
         for(HealthSupplement hs : healthSupplements) upsertDur(buildDurRow(hs.getId(),DurType.SUPPLEMENT));
 
     }
+
+    public void batchDose() throws IOException {
+        List<DoseRow> documentsToUpsert = parseAndCreateDocuments(intakeName);
+
+        for(DoseRow doc : documentsToUpsert){
+            upsertDose(doc);
+        }
+    }
+
 
     public ProductRow buildDrugRow(Long id) {
         // 한 번의 쿼리로 Drug과 관련된 DrugEffect, DrugStorageCondition을 가져옵니다.
@@ -144,16 +164,76 @@ public class RagIndexRouter {
 
     // 용법/용량 인덱싱
     public void upsertDose(DoseRow r) {
-        String text = "%s(%s, 단위 %s). 성인: %s. 소아: %s. 주의: %s."
-                .formatted(nvl(r.title()), nvl(r.form()), nvl(r.unit()),
-                        nz(r.adult()), nz(r.child()), nz(r.caution()));
+        String text = "이름:%s %s 상태:%s 충분섭취량:%s 권장섭취량:%s,최소량:%s,최대량:%s,비고:%s"
+                .formatted(nvl(r.name()), nvl(r.ageRange()), nvl(r.gender()),nvl(r.enough()), nvl(r.recommend()),
+                        nz(r.min()), nz(r.max()), nz(r.unit()));
 
         Map<String,Object> meta = new LinkedHashMap<>();
-        put(meta, "doseId", r.doseId());
-        put(meta, "form", r.form());
+        put(meta, "name", r.name());
+        put(meta, "ageRange", r.ageRange());
+        put(meta, "gender", r.gender());
+        put(meta, "enough", r.enough());
+        put(meta, "recommend", r.recommend());
+        put(meta, "min", r.min());
+        put(meta, "max", r.max());
         put(meta, "unit", r.unit());
 
-        add(doseVS, nvl(r.title()), text, "db:dose", nvl(r.doseId()), meta);
+        add(doseVS, nvl(r.ageRange()), text, "range", nvl(r.ageRange()), meta);
+    }
+
+    public List<DoseRow> parseAndCreateDocuments(String intakeFilePath) throws IOException, IOException {
+        List<DoseRow> documents = new ArrayList<>();
+        FileInputStream fis = new FileInputStream(intakeFilePath);
+        Workbook workbook = new XSSFWorkbook(fis);
+
+        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+            Sheet sheet = workbook.getSheetAt(i);
+            String nutrientName = sheet.getSheetName();
+            if (nutrientName.equals("인")) continue;
+
+            String currentGender = null;
+            String currentAgeRange = null;
+
+            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                Row row = sheet.getRow(rowIndex);
+                if (row == null) continue;
+
+                // ... (기존 성별, 연령 파싱 로직은 동일) ...
+                Cell genderCell = row.getCell(0);
+                Cell ageCell = row.getCell(1);
+                String genderRaw = getString(genderCell);
+                String ageRangeRaw = getString(ageCell);
+                if (genderRaw != null && !genderRaw.isEmpty()) currentGender = genderRaw;
+                if (ageRangeRaw != null && !ageRangeRaw.isEmpty()) currentAgeRange = ageRangeRaw;
+                if (currentGender == null || currentAgeRange == null) continue;
+
+                // 값 파싱
+                String recommend = getString(row.getCell(2));
+                String enough = getString(row.getCell(3));
+                String minimum = getString(row.getCell(4));
+                String maximum = getString(row.getCell(5));
+                String unit = getString(row.getCell(6));
+
+                DoseRow doseRow = new DoseRow(
+                        nutrientName,
+                        currentGender,
+                        currentAgeRange,
+                        minimum,
+                        maximum,
+                        recommend,
+                        enough,
+                        unit
+                );
+                documents.add(doseRow);
+            }
+        }
+
+        workbook.close();
+        return documents;
+    }
+
+    private String getString(Cell cell) {
+        return (cell != null) ? cell.getStringCellValue().trim() : null;
     }
 
     public void deleteAllClassData(String className) {
