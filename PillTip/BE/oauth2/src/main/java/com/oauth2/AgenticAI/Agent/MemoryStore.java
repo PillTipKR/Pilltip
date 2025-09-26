@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class MemoryStore {
 
     private static final int MAX_TURNS = 60; // 최근 60 메시지만 유지(원하면 조정)
-
+    private static int cnt = 0;
     private final Map<String, Deque<Message>> history = new ConcurrentHashMap<>();
     private final Map<String, String> summary = new ConcurrentHashMap<>();
 
@@ -34,7 +34,11 @@ public class MemoryStore {
 
     public void appendToolResult(String session, String userText, String output) {
 
-        String summary = session+"\n"+userText+"\n"+output;
+        String summary = "["+cnt+"번째 대화]\n"
+                +session+"\n"
+                +userText+"\n"
+                +output+"\n"
+                +"-----------------------------------------------------\n";
         Message summaryMessage = new AssistantMessage(summary);
         addMessage(session, summaryMessage);
     }

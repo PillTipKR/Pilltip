@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,9 +64,9 @@ public class WeaviateController {
     }
 
     @PostMapping("/dose")
-    public Map<String,Object> dose(@RequestBody DoseRow row){
-        index.upsertDose(row);
-        return Map.of("ok", true, "id", row.doseId());
+    public String dose() throws IOException {
+        index.batchDose();
+        return "OK";
     }
 
     @GetMapping("/retrieve/product")

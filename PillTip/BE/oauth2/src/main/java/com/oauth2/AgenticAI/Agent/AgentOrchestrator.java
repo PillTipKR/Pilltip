@@ -30,7 +30,6 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import reactor.core.scheduler.Schedulers;
-import reactor.util.context.ContextView;
 
 import java.util.*;
 
@@ -88,11 +87,13 @@ public class AgentOrchestrator {
     private static final String SYS_ANSWER_RECAP = """
             말투: 한국어 구어체 존댓말(~요).
             형식:
-              "찾아본 top-k(TOPK)개의 제품중 SAFE_COUNT개의 제품이 NICK님의 정보를 바탕으로 진행한 DUR체크를 통해 안전하게 필터링되었어요."
-              "다음과 같은 제품들이 있었어요."
+              "찾아본 TOPK개의 제품중 SAFE_COUNT개의 제품이 NICK님의 정보를 바탕으로 진행한 DUR체크를 통해 안전하게 필터링되었어요."
+              "이런 제품들을 참고하시면 좋을 것 같아요!"
               SAFE_ITEMS들을 각각 컨텍스트만을 활용하여 문맥에 자연스럽고 친절하게 다듬어 소개
-            원칙: 숫자/이름이 주어지면 그대로 사용, 없으면 해당 문장은 생략하고 간단 요약만 말할 것.
-            """;
+            원칙:\s
+              - 숫자/이름이 주어지면 그대로 사용, 없으면 해당 문장은 생략하고 간단 요약만 말할 것.
+              - 마크다운은 사용하지 말 것.\s
+           \s""";
 
     private static final String SYS_ANSWER_DUR = """
             [출력 지시]
@@ -101,6 +102,7 @@ public class AgentOrchestrator {
             **[매우 중요한 규칙]**
             - **답변은 오직 [DUR 정보] 섹션에 명시된 `name`인 '%s'와 '%s'만을 기반으로 생성해야 합니다.**
             - **대화 기록에 이전에 언급된 다른 약물 이름(예: 아세트아미노펜, 와파린 등)은 절대 답변에 사용해서는 안 됩니다.**
+            - **이전 대화와 현재 질문이 병합시 문맥상 직접적인 연관이 없다면, 현재 대화만을 사용하여 툴 선택 및 답변을 하도록 합니다.**
 
             1.  **어조 및 스타일**:
                 - 모든 설명은 부드러운 해요체(~요)로 작성하고, '~니다' 같은 딱딱한 표현은 사용하지 마세요.
@@ -170,6 +172,7 @@ public class AgentOrchestrator {
             int safeCount = 0;
             List<Map<String,Object>> safeItems = new ArrayList<>(); // [{id,name,effect,meta?}]
             Map<String, Map<String,Object>> candidateById = new HashMap<>();
+            Map<String, String> doseInfo = new HashMap<>();
             DurAnalysisResponse durInfoJsonResponse = null;
 
             List<String> executedTools = new ArrayList<>();
@@ -205,7 +208,6 @@ public class AgentOrchestrator {
                     ragJsonResponse = trm.getResponses().get(0).responseData();
                 }
 
-                memory.appendToolResult(session, "ProductRagTool", ragJsonResponse);
                 executedTools.add("ProductRagTool");
 
                 Map<String,Object> body = parseMap(ragJsonResponse);
@@ -265,7 +267,6 @@ public class AgentOrchestrator {
                     e.printStackTrace();
                 }
 
-                memory.appendToolResult(session, "DurFilterTool", durJsonResponse);
                 executedTools.add("DurFilterTool");
 
                 safeCount = dr.count();
@@ -274,7 +275,7 @@ public class AgentOrchestrator {
                 if (!tmp.isEmpty()) safeItems = tmp;
 
                 events.add(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
-
+                history = new ArrayList<>(ragExec.conversationHistory());
             }
             if(planned.contains("DurTool")){
                 // --- 1. 제품 탐색 단계 ---
@@ -296,9 +297,8 @@ public class AgentOrchestrator {
                     return Flux.just(StreamEvent.error(EventCode.BAD_REQUEST, "DurTool 실행에 실패했습니다."));
                 }
 
-                List<Message> his = new ArrayList<>(durexec.conversationHistory());
-                System.out.println(history);
-                Message lastMessage = his.get(his.size() - 1);
+                history = new ArrayList<>(durexec.conversationHistory());
+                Message lastMessage = history.get(history.size() - 1);
                 if (lastMessage instanceof ToolResponseMessage trm) {
                     var conv = new BeanOutputConverter<>(DurAnalysisResponse.class);
                     // conv.getFormat()을 프롬프트/툴 포맷 힌트로 넣고…
@@ -309,6 +309,63 @@ public class AgentOrchestrator {
 
                     events.add(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
                 }
+            }
+
+            if (planned.contains("DoseInfoTool")) {
+
+                // --- 1. 제품 탐색 단계 ---
+                events.add(StreamEvent.status(EventCode.DOSE_INFO_CHECK_START, "섭취량 정보를 확인 중이에요."));
+
+                ToolExecutionResult doseExec = null;
+                try {
+                    if (userId != null) SessionUtils.set(session, userId, nick);
+                    // ProductRagTool만 지정해서 실행
+                    doseExec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
+                } catch(Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    SessionUtils.clear();
+                }
+
+                if (doseExec == null) {
+                    // 에러 상황이므로 더 이상 진행하지 않고 Flux를 반환해야 할 수 있습니다.
+                    return Flux.just(StreamEvent.error(EventCode.BAD_REQUEST, "DoseInfoTool 실행에 실패했습니다."));
+                }
+
+                history = new ArrayList<>(doseExec.conversationHistory());
+
+                String doseJsonResponse = "";
+                Message lastMessage = history.get(history.size() - 1);
+                if (lastMessage instanceof ToolResponseMessage trm) {
+                    doseJsonResponse = trm.getResponses().get(0).responseData();
+                }
+
+                executedTools.add("DoseInfoTool");
+
+                Map<String,Object> body = parseMap(doseJsonResponse);
+                List<Map<String,Object>> doseSnippet = getList(body, "meta");
+
+                if (!doseSnippet.isEmpty()) {
+                    for (Map<String,Object> meta : doseSnippet) {
+                        String name = String.valueOf(meta.getOrDefault("name",""));
+                        String gender = String.valueOf(meta.getOrDefault("gender",""));
+                        String ageRange = String.valueOf(meta.getOrDefault("ageRange",""));
+                        String min = String.valueOf(meta.getOrDefault("min",""));
+                        String max = String.valueOf(meta.getOrDefault("max",""));
+                        String recommend = String.valueOf(meta.getOrDefault("recommend",""));
+                        String enough = String.valueOf(meta.getOrDefault("enough",""));
+                        String unit = String.valueOf(meta.getOrDefault("unit",""));
+                        doseInfo.put("name", name);
+                        doseInfo.put("gender", gender);
+                        doseInfo.put("ageRange", ageRange);
+                        doseInfo.put("min", min);
+                        doseInfo.put("max", max);
+                        doseInfo.put("recommend", recommend);
+                        doseInfo.put("enough", enough);
+
+                    }
+                }
+                events.add(StreamEvent.status(EventCode.DOSE_INFO_CHECK_RESULT, "섭취량 정보를 찾았어요."));
             }
 
             // 3) 툴콜이 전혀 없던 케이스 → 거절/단답 처리
@@ -357,7 +414,7 @@ public class AgentOrchestrator {
             // 모드 결정
             AnswerMode mode = pickMode(executedTools);
 
-            if (mode == AnswerMode.RECAP && (topK > 0 || safeCount > 0 || !safeItems.isEmpty())) {
+            if (mode.equals(AnswerMode.RECAP) && (topK > 0 || safeCount > 0 || !safeItems.isEmpty())) {
                 List<String> lines = new ArrayList<>();
                 int limit = Math.min(5, safeItems.size());
                 for (int i = 0; i < limit; i++) {
@@ -388,7 +445,7 @@ public class AgentOrchestrator {
                 followupMsgs.add(new SystemMessage(recap));
             }
 
-            if (mode == AnswerMode.DUR_INFO) {
+            else if (mode.equals(AnswerMode.DUR_INFO)) {
                 if(durInfoJsonResponse != null) {
                     String template = createDurPrompt(durInfoJsonResponse);
 
@@ -401,6 +458,21 @@ public class AgentOrchestrator {
                     followupMsgs.add(new SystemMessage(error));
                 }
             }
+//            else if(mode.equals(AnswerMode.DOSE_INFO)){
+//                String recap = """
+//                [변수]
+//                성분명 : %s
+//                타입 : %s
+//
+//
+//
+//                [출력 지시]
+//                TOPK가 0이면 "추천 후보 중"으로 표현하고, 숫자는 SAFE_COUNT를 사용해도 된다.
+//                숫자/이름은 임의 변경하지 말 것.
+//                """.formatted(topKOrSafe, safeCount, nick, safeListBlock);
+//
+//                followupMsgs.add(new SystemMessage(recap));
+//            }
 
             // 모드별 말투/형식 프롬프트 부착
             switch (mode) {

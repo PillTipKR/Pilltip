@@ -40,9 +40,7 @@ public class DurFilterTool {
         // 3) 후보별 평가
         List<FillteredDto> kept = new ArrayList<>();
         int removed = 0;
-        System.out.println("user:"+user.getNickname() + "c:"+req.candidates().size());
         for (ProductCandidate c : req.candidates()) {
-            System.out.println(c.toString());
             Drug drug = drugRepository.findByName(c.name().replaceAll("제품:","")).orElse(null);
 
             if (drug == null) {
@@ -50,7 +48,6 @@ public class DurFilterTool {
                 removed++;
                 continue;
             }
-            System.out.println(drug.getName());
             String effect = drugEffectRepository.findContentsByDrugIdAndType(drug.getId(), DrugEffect.Type.EFFECT).get(0);
 
             if (durTaggingService.checkDrugsDur(user,drug)) {
