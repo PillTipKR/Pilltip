@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +49,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -61,6 +63,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -121,6 +124,7 @@ import com.pilltip.pilltip.model.search.DetailDrugData
 import com.pilltip.pilltip.model.search.LogViewModel
 import com.pilltip.pilltip.model.search.ReviewViewModel
 import com.pilltip.pilltip.model.search.SearchHiltViewModel
+import com.pilltip.pilltip.ui.theme.backgroundColor
 import com.pilltip.pilltip.ui.theme.gray050
 import com.pilltip.pilltip.ui.theme.gray100
 import com.pilltip.pilltip.ui.theme.gray200
@@ -148,6 +152,7 @@ fun SearchPage(
     searchViewModel: SearchHiltViewModel
 ) {
     var inputText by remember { mutableStateOf("") }
+    var selected by remember { mutableIntStateOf(0) }
     val recentSearches by logViewModel.recentSearches.collectAsState()
     val autoCompleted by searchViewModel.autoCompleted.collectAsState()
     val isLoading by searchViewModel.isAutoCompleteLoading.collectAsState()
@@ -200,6 +205,68 @@ fun SearchPage(
                 Log.d("Query: ", query)
             }
         )
+        HeightSpacer(14.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(57.dp)
+                .background(Color(0xFFFDFDFD))
+        ) {
+            Column(
+                modifier = Modifier.weight(1f).noRippleClickable { selected = 0 }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "의약품",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontFamily = pretendard,
+                            fontWeight = FontWeight(600),
+                            color = if(selected == 0) gray800 else gray300,
+                        )
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    thickness = if(selected == 0) 1.5.dp else 1.0.dp,
+                    color = if(selected == 0) gray800 else gray200
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f).noRippleClickable { selected = 1 }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "건강기능식품",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontFamily = pretendard,
+                            fontWeight = FontWeight(600),
+                            color = if(selected == 1) gray800 else gray300,
+                        )
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    thickness = if(selected == 1) 1.5.dp else 1.0.dp,
+                    color = if(selected == 1) gray800 else gray200
+                )
+            }
+        }
         HeightSpacer(28.dp)
         if (inputText.isEmpty()) {
             Row(
