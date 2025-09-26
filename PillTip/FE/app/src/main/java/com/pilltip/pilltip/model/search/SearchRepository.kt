@@ -728,7 +728,7 @@ class AgentChatRepositoryImpl @Inject constructor(
 ) : AgentChatRepository {
 
     override fun runAgent(userText: String, session: Int): Flow<AgentUiEvent> = callbackFlow {
-        val url = retrofit.baseUrl().toString() + "/api/agent/run"
+        val url = retrofit.baseUrl().toString() + "api/agent/run"
         val json = gson.toJson(AgentRunRequest(userText, session))
         val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
 
