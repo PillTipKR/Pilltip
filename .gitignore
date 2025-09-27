@@ -40,3 +40,10 @@ out/
 
 ### application.properties 파일 ###
 application.properties
+
+### application.properties 파일 ###
+**/PillTip/BE/oauth2/docker-compose.yml
+
+## .DS_Store cache ##
+.DS_Store
+**/.DS_Store
