@@ -13,7 +13,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 
 ## 서비스 시연 영상
 <p align="center">
-  <a href="https://youtu.be/FZAfDYjt-C8">
+  <a href="https://youtu.be/IpjfK8htpEg?si=AtUsYJdtsLTs1Iy-">
     <img src="https://github.com/user-attachments/assets/acf08b38-7677-4f70-9eb6-44eb7b047346" width="10%" alt="서비스 시연 영상">
   </a>
 </p>
@@ -132,6 +132,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 
 Copyright 2025 '**Pilltip**' All right reserved.
 본 레포지토리 내 코드 또는 작업물의 무단 복제 및 사전 동의 없는 활용을 금합니다.
+
 
 
 
