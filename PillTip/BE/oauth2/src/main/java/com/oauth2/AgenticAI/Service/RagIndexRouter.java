@@ -13,10 +13,7 @@ import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
 import io.weaviate.client.WeaviateClient;
 import lombok.RequiredArgsConstructor;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -46,6 +43,7 @@ public class RagIndexRouter {
     private final HealthSupplementRepository supplementRepository;
     private final IngredientRepository ingredientRepository;
     private final WeaviateClient client;
+    private final DataFormatter formatter = new DataFormatter();
 
     public void batchDrug(){
         List<Drug> drugs = drugRepository.findAll().stream()
@@ -178,7 +176,50 @@ public class RagIndexRouter {
         put(meta, "max", r.max());
         put(meta, "unit", r.unit());
 
-        add(doseVS, nvl(r.ageRange()), text, "range", nvl(r.ageRange()), meta);
+        Integer[] ageInMonths = parseAgeRangeToMonths(r.ageRange());
+        if (ageInMonths != null) {
+            put(meta, "age_start_months", ageInMonths[0]);
+            put(meta, "age_end_months", ageInMonths[1]);
+        }
+
+        add(doseVS, nvl(r.ageRange()), text, "text", nvl(r.ageRange()), meta);
+    }
+
+    private Integer[] parseAgeRangeToMonths(String ageRange) {
+        if (ageRange == null || ageRange.isBlank()) return null;
+
+        // 예시 패턴: "A~B세", "A~B개월", "A세 이상"
+        Pattern yearRangePattern = Pattern.compile("(\\d+)\\s*~\\s*(\\d+)\\s*세");
+        Pattern monthRangePattern = Pattern.compile("(\\d+)\\s*~\\s*(\\d+)\\s*개월");
+        Pattern yearOverPattern = Pattern.compile("(\\d+)\\s*세\\s*이상");
+
+        Matcher m;
+
+        m = yearRangePattern.matcher(ageRange);
+        if (m.find()) {
+            int startYear = Integer.parseInt(m.group(1));
+            int endYear = Integer.parseInt(m.group(2));
+            // X세의 마지막 날은 (X+1) * 12 - 1 개월까지 포함
+            return new Integer[]{startYear * 12, (endYear + 1) * 12 - 1};
+        }
+
+        m = monthRangePattern.matcher(ageRange);
+        if (m.find()) {
+            int startMonth = Integer.parseInt(m.group(1));
+            int endMonth = Integer.parseInt(m.group(2));
+            return new Integer[]{startMonth, endMonth};
+        }
+
+        m = yearOverPattern.matcher(ageRange);
+        if (m.find()) {
+            int startYear = Integer.parseInt(m.group(1));
+            // 종료 나이를 매우 큰 값으로 설정 (예: 150세)
+            return new Integer[]{startYear * 12, 150 * 12};
+        }
+
+        // 다른 형식의 패턴이 있다면 여기에 추가...
+
+        return null; // 맞는 패턴이 없을 경우
     }
 
     public List<DoseRow> parseAndCreateDocuments(String intakeFilePath) throws IOException, IOException {
@@ -233,7 +274,11 @@ public class RagIndexRouter {
     }
 
     private String getString(Cell cell) {
-        return (cell != null) ? cell.getStringCellValue().trim() : null;
+        if (cell == null) {
+            return "";
+        }
+        // formatCellValue는 어떤 타입의 셀이든 알아서 문자열로 변환해 줍니다.
+        return formatter.formatCellValue(cell).trim();
     }
 
     public void deleteAllClassData(String className) {

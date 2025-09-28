@@ -55,9 +55,7 @@ public class AgentOrchestrator {
     private static final String SYS_BASE = """
             역할: 한국어 우선, 도구-우선 에이전트.
             규칙:
-            - 증상을 설명하면 반드시 ProductRagTool 툴을 호출
-            - 제품/추천 요청이면 반드시 ProductRagTool 툴 호출.
-            - ProductRagTool 응답의 candidates를 DurFilterTool req.candidates로 그대로 전달.
+            - 제품 추천/증상 설명이면 반드시 ProductRagTool 툴 호출.
             - 필요한 값이 비면 AskUserTool로 1~2개만 짧게 되물음.
             - (중요) 이 단계에서는 '최종 답변 문장'을 쓰지 말 것. 가능한 한 툴 호출만 생성.
             - [DurTool 규칙] 사용자가 두 개 이상의 약품/성분 간의 상호작용을 질문하면, 아래 '호출 예시'를 참고하여 문장에서 **핵심이 되는 이름 두 개를 추출**하고 `DurTool`을 호출해야 합니다.
@@ -68,19 +66,29 @@ public class AgentOrchestrator {
               1. 사용자 입력: "타이레놀이랑 아스피린 같이 먹어도 괜찮아?"
                  올바른 Tool 호출: DurTool(name1="타이레놀", name2="아스피린")
             
-              2. 사용자 입력: "마그네슘하고 칼슘의 상호작용이 궁금해"
-                 올바른 Tool 호출: DurTool(name1="마그네슘", name2="칼슘")
-            
-              3. 사용자 입력: "제가 먹는 영양제랑 이 약을 같이 복용해도 될까요?"
+              2. 사용자 입력: "제가 먹는 영양제랑 이 약을 같이 복용해도 될까요?"
                  올바른 Tool 호출: AskUserTool(question="영양제와 약의 이름이 어떻게 되나요?")
+            
+            - [DoseInfoTool 규칙]
+              - 사용자가 '섭취량', '복용량', '권장량' 등을 물어보면 DoseInfoTool을 사용해야 합니다.
+              - 사용자의 질문에서 **'영양소/제품 이름'과 '나이'를 명확히 분리하여 각각 `nutrient`와 `age` 파라미터에 전달**해야 합니다.
+            
+                [호출 예시]
+                1. 사용자 입력: "11살 비타민D 하루 권장량 알려줘"
+                   올바른 Tool 호출: DoseInfoTool(nutrient="비타민D 하루 권장량", age="11살")
+            
+                2. 사용자 입력: "초등학생 아들 철분 섭취량"
+                   올바른 Tool 호출: AskUserTool호출 // 나이가 모호하므로 정확히 물어보기.
+            
+            [대화 연속성 규칙]
+            - 이전 대화에서 사용자에게 정보를 물어봤고, 사용자가 그에 대한 답변(예: 나이, 학년, 개월 수)만 간단히 제공하면, 그 새로운 정보를 **이전 대화의 맥락과 결합하여** 원래 호출하려던 도구를 다시 호출해야 합니다.
+              - 예시: 제가 "몇 학년인가요?"라고 물은 뒤 사용자가 "5학년이요"라고 답하면, 이전 대화의 '비타민C'와 결합하여 `DoseInfoTool(nutrient="비타민C",age="11살")`를 호출해야 합니다.
+            
             지원 범위:
-            - 제품/성분 후보 찾기(ProductRagTool), DUR 상호작용/금기/주의 정보 알림(DurTool), 추가질문(AskUserTool)
-            출력 스키마:
-            - DurFilterTool 응답(JSON): { "filtered":[{ "id":long, "name":string, "effect":string }], "count": int }
+            - 제품/성분 후보 찾기(ProductRagTool), DUR 상호작용/금기/주의 정보 알림(DurTool), 섭취량 관련 정보 알림(DoseInfoTool), 추가질문(AskUserTool)
             스코프 밖 요청 처리:
             - 범위를 벗어나거나 도구가 없으면 툴 호출을 만들지 말고 아래 형식 한 줄만 출력:
               REFUSAL: 요청하신 내용은 현재 제공 범위를 벗어나요. (제가 할 수 있는 것: 제품 후보 찾기·상호작용(DUR) 확인·복용 주의 안내) 원하는 제품/성분 기준으로 다시 말씀해 주시겠어요?
-            언어: 한국어.
             """;
 
     // --- 2단계: 최종 답변 전용 프롬프트(모드 3종) ---
@@ -90,25 +98,25 @@ public class AgentOrchestrator {
               "찾아본 TOPK개의 제품중 SAFE_COUNT개의 제품이 NICK님의 정보를 바탕으로 진행한 DUR체크를 통해 안전하게 필터링되었어요."
               "이런 제품들을 참고하시면 좋을 것 같아요!"
               SAFE_ITEMS들을 각각 컨텍스트만을 활용하여 문맥에 자연스럽고 친절하게 다듬어 소개
-            원칙:\s
+            원칙:
               - 숫자/이름이 주어지면 그대로 사용, 없으면 해당 문장은 생략하고 간단 요약만 말할 것.
-              - 마크다운은 사용하지 말 것.\s
-           \s""";
+              - 마크다운은 사용하지 말 것.
+              **[매우 중요한 규칙]**
+            - **답변은 오직 아래에 명시된 '%s'와 '%d'만을 기반으로 생성해야 합니다.**
+            - **이전 대화와 현재 질문이 병합시 문맥상 직접적인 연관이 없다면, 현재 대화만을 사용하여 툴 선택 및 답변을 하도록 합니다.**
+           """;
 
     private static final String SYS_ANSWER_DUR = """
             [출력 지시]
             당신은 사용자의 건강을 염려하는 친절한 전문가입니다. 아래 지침에 따라, [DUR 정보]를 바탕으로 사용자에게 설명을 생성해 주세요.
             
             **[매우 중요한 규칙]**
-            - **답변은 오직 [DUR 정보] 섹션에 명시된 `name`인 '%s'와 '%s'만을 기반으로 생성해야 합니다.**
-            - **대화 기록에 이전에 언급된 다른 약물 이름(예: 아세트아미노펜, 와파린 등)은 절대 답변에 사용해서는 안 됩니다.**
-            - **이전 대화와 현재 질문이 병합시 문맥상 직접적인 연관이 없다면, 현재 대화만을 사용하여 툴 선택 및 답변을 하도록 합니다.**
-
-            1.  **어조 및 스타일**:
-                - 모든 설명은 부드러운 해요체(~요)로 작성하고, '~니다' 같은 딱딱한 표현은 사용하지 마세요.
-                - 전문 용어 대신, 환자가 쉽게 이해할 수 있는 단어로 풀어 설명해 주세요.
-                - 사용자가 약을 '복용하기 전' 상태임을 강조하며, '복용 전 확인해 주세요', '이런 점을 주의해야 해요' 등의 표현을 사용하세요.
-
+            - **답변은 오직 [DUR 정보] 섹션에 명시된 `name`인 '%s'만을 기반으로 생성해야 합니다.**
+            - 사용자는 아직 어떤 약이나 건강기능식품도 복용하고 있지 않습니다.
+            - 사용자는 두 가지 성분을 함께 복용하기 전, 안전성에 대한 정보를 확인하고 싶어합니다.
+            - 주어진 정보만을 사용하여 해요체로 친절히 안내해주세요.
+            - '복용 중인', '드시고 계신' 등의 표현은 절대 사용하면 안 됩니다.
+            
             2.  **내용 구성**:
                 - **첫 번째 문단**: 약 A(%s)에 대해 설명합니다. 문단은 반드시 '%s' 이름으로 시작해야 합니다.
                   - `durtags`가 있다면, 각 `title`을 빠짐없이 언급하며 `reason`과 `note`를 종합해 자연스러운 문장으로 설명하세요.
@@ -127,12 +135,9 @@ public class AgentOrchestrator {
 
     private static final String SYS_ANSWER_DOSE = """
             말투: 한국어 구어체 존댓말(~요).
-            형식:
-              ① 누가·언제·얼마(요약)
-              ② •복용 방법(용량/간격/식전후)
-              ③ 주의/금기
-              ④ 잊었을 때/과량 시 대처
             원칙: 연령/상태별 차이는 분명히, 불확실성 명시.
+            - 숫자/이름은 임의 변경하지 말 것.
+            - 주어진 섭취량 정보만을 소개할 것. 이외의 정보는 생성하지 말 것.
             """;
 
     private enum AnswerMode { RECAP, DUR_INFO, DOSE_INFO }
@@ -343,28 +348,25 @@ public class AgentOrchestrator {
                 executedTools.add("DoseInfoTool");
 
                 Map<String,Object> body = parseMap(doseJsonResponse);
-                List<Map<String,Object>> doseSnippet = getList(body, "meta");
-
-                if (!doseSnippet.isEmpty()) {
-                    for (Map<String,Object> meta : doseSnippet) {
-                        String name = String.valueOf(meta.getOrDefault("name",""));
-                        String gender = String.valueOf(meta.getOrDefault("gender",""));
-                        String ageRange = String.valueOf(meta.getOrDefault("ageRange",""));
-                        String min = String.valueOf(meta.getOrDefault("min",""));
-                        String max = String.valueOf(meta.getOrDefault("max",""));
-                        String recommend = String.valueOf(meta.getOrDefault("recommend",""));
-                        String enough = String.valueOf(meta.getOrDefault("enough",""));
-                        String unit = String.valueOf(meta.getOrDefault("unit",""));
-                        doseInfo.put("name", name);
-                        doseInfo.put("gender", gender);
-                        doseInfo.put("ageRange", ageRange);
-                        doseInfo.put("min", min);
-                        doseInfo.put("max", max);
-                        doseInfo.put("recommend", recommend);
-                        doseInfo.put("enough", enough);
-
-                    }
+                System.out.println(body);
+                if (!body.isEmpty()) {
+                    Map<String,Object> meta = (Map<String, Object>) body.get("meta");
+                    String name = String.valueOf(meta.getOrDefault("name",""));
+                    String gender = String.valueOf(meta.getOrDefault("gender",""));
+                    String min = String.valueOf(meta.getOrDefault("min",""));
+                    String max = String.valueOf(meta.getOrDefault("max",""));
+                    String recommend = String.valueOf(meta.getOrDefault("recommend",""));
+                    String enough = String.valueOf(meta.getOrDefault("enough",""));
+                    String unit = String.valueOf(meta.getOrDefault("unit",""));
+                    doseInfo.put("name", name);
+                    doseInfo.put("gender", gender);
+                    doseInfo.put("min", min);
+                    doseInfo.put("max", max);
+                    doseInfo.put("recommend", recommend);
+                    doseInfo.put("enough", enough);
+                    doseInfo.put("unit", unit);
                 }
+                doseInfo.put("age", String.valueOf(body.get("age")));
                 events.add(StreamEvent.status(EventCode.DOSE_INFO_CHECK_RESULT, "섭취량 정보를 찾았어요."));
             }
 
@@ -458,21 +460,30 @@ public class AgentOrchestrator {
                     followupMsgs.add(new SystemMessage(error));
                 }
             }
-//            else if(mode.equals(AnswerMode.DOSE_INFO)){
-//                String recap = """
-//                [변수]
-//                성분명 : %s
-//                타입 : %s
-//
-//
-//
-//                [출력 지시]
-//                TOPK가 0이면 "추천 후보 중"으로 표현하고, 숫자는 SAFE_COUNT를 사용해도 된다.
-//                숫자/이름은 임의 변경하지 말 것.
-//                """.formatted(topKOrSafe, safeCount, nick, safeListBlock);
-//
-//                followupMsgs.add(new SystemMessage(recap));
-//            }
+            else if(mode.equals(AnswerMode.DOSE_INFO)){
+                String recap = """
+                [변수]
+                사용자 연령 : %s
+                성분명 : %s
+                타입 : %s
+                충분 섭취량 : %s
+                권장 섭취량 : %s
+                최소 섭취량 : %s
+                최대 섭취량 : %s
+                비고 : %s
+                """.formatted(
+                        doseInfo.get("age"),
+                        doseInfo.get("name"),
+                        doseInfo.get("gender"),
+                        doseInfo.get("enough"),
+                        doseInfo.get("recommend"),
+                        doseInfo.get("min"),
+                        doseInfo.get("max"),
+                        doseInfo.get("unit")
+                );
+
+                followupMsgs.add(new SystemMessage(recap));
+            }
 
             // 모드별 말투/형식 프롬프트 부착
             switch (mode) {
@@ -623,12 +634,6 @@ public class AgentOrchestrator {
 
         // 최종 프롬프트 템플릿
         String promptTemplate = """
-            [컨텍스트]
-            사용자는 아직 어떤 약이나 건강기능식품도 복용하고 있지 않습니다.
-            사용자는 두 가지 성분을 함께 복용하기 전, 안전성에 대한 정보를 확인하고 싶어합니다.
-            따라서, 사용자의 입장에서 복용 전 알아야 할 주의사항을 친절하고 이해하기 쉽게 설명해야 합니다.
-            '복용 중인', '드시고 계신' 등의 표현은 절대 사용하면 안 됩니다.
-
             [DUR 정보]
             - 약/건강기능식품 A:
               - name: %s

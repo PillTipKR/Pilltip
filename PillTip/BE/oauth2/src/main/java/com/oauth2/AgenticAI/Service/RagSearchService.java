@@ -21,11 +21,15 @@ public class RagSearchService {
     @Qualifier("doseRetriever")    private final DocumentRetriever doseRetriever;
 
     // Service
-    public List<Document> search(String q, Integer k, DocumentRetriever retriever) {
-        Map<String,Object> ctx = new LinkedHashMap<>();
-        if (k != null && k > 0) ctx.put("topK", k);
-        // 원하면 메타 필터도 같이
-        // ctx.put("filter", Map.of("source","effect"));
+    public List<Document> search(String q, Integer k, Map<String, Object> filterExpression, DocumentRetriever retriever) {
+        Map<String, Object> ctx = new LinkedHashMap<>();
+        if (k != null && k > 0) {
+            ctx.put("topK", k);
+        }
+        // 전달받은 필터 표현식이 있으면 컨텍스트에 추가합니다.
+        if (filterExpression != null && !filterExpression.isEmpty()) {
+            ctx.put("filter", filterExpression);
+        }
 
         Query query = Query.builder()
                 .text(q)
@@ -35,16 +39,41 @@ public class RagSearchService {
         return retriever.retrieve(query);
     }
 
-    public List<Document> searchDose(String q, Integer k) {
-        return search(q,k,doseRetriever);
+    public List<Document> searchDose(String nutrientName, Integer k, Integer userAgeInMonths) {
+        Map<String, Object> filter = null;
+
+        if (userAgeInMonths != null) {
+            // 1. 첫 번째 조건: age_start_months <= userAgeInMonths
+            Map<String, Object> condition1 = Map.of(
+                    "path", List.of("age_start_months"),
+                    "operator", "LessThanEqual",
+                    "valueInt", userAgeInMonths
+            );
+
+            // 2. 두 번째 조건: age_end_months >= userAgeInMonths
+            Map<String, Object> condition2 = Map.of(
+                    "path", List.of("age_end_months"),
+                    "operator", "GreaterThanEqual",
+                    "valueInt", userAgeInMonths
+            );
+
+            // 3. 두 조건을 AND 연산자로 묶습니다.
+            filter = Map.of(
+                    "operator", "And",
+                    "operands", List.of(condition1, condition2)
+            );
+        }
+
+        // 필터와 함께 범용 search 메서드를 호출합니다.
+        return search(nutrientName, k, filter, doseRetriever);
     }
 
     public List<Document> searchDur(String q, Integer k) {
-        return search(q,k,durRetriever);
+        return search(q,k,null,durRetriever);
     }
 
     public List<Document> searchProduct(String q, Integer k) {
-        return search(q,k,productRetriever);
+        return search(q,k,null,productRetriever);
     }
 
 }
