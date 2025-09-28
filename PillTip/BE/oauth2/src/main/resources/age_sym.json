@@ -1,0 +1,30 @@
+[
+  {
+    "category": "영아",
+    "representative_age": 1,
+    "synonyms": ["아기", "애기", "갓난아기", "신생아", "영아"],
+    "requires_clarification": true,
+    "clarification_question": "정확한 정보를 위해 아기가 몇 개월인지 알려주실 수 있나요?"
+  },
+  {
+    "category": "유아",
+    "representative_age": 4,
+    "synonyms": ["어린이", "꼬마", "애", "아이", "유아","유치원생"],
+    "requires_clarification": false,
+    "clarification_question": "정확한 정보를 위해 몇 살인지 알려주실 수 있나요?"
+  },
+  {
+    "category": "초등학생",
+    "representative_age": 10,
+    "synonyms": ["초딩", "초등생", "초등학교"],
+    "requires_clarification": false,
+    "clarification_question": "정확한 정보를 위해 초등학교 몇 학년인지 알려주실 수 있나요?"
+  },
+  {
+    "category": "중학생",
+    "representative_age": 15,
+    "synonyms": ["중딩", "중등생", "중학교","사춘기"],
+    "requires_clarification": false,
+    "clarification_question": "정확한 정보를 위해 중학교 몇 학년인지 알려주실 수 있나요?"
+  }
+]

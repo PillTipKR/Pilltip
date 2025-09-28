@@ -23,15 +23,12 @@ public class RetrieverConfig {
 
     @Bean("productRetriever")
     public WeaviateHybridRetriever productRetriever(WeaviateClient client) {
-        // 서버측 필터로 source를 쓰고 싶다면, 'source'가 스키마 속성으로 존재해야 함
-        String where = null; // 예: "where: { path: [\"source\"], operator: Equal, valueText: \"effect\" }"
         return new WeaviateHybridRetriever(
                 client,
                 "ProductDoc",                // 클래스명
                 List.of("content"),                    // BM25 대상
                 List.of("content"),                    // 텍스트 필드 후보
                 SELECT_BASE,                 // 선택 필드
-                where,                       // where 절(옵션)
                 0.5,                          // alpha: 0에 가까울수록 키워드 검색 비중 높음.
                 embeddingModel
         );
@@ -39,14 +36,12 @@ public class RetrieverConfig {
 
     @Bean("durRetriever")
     public WeaviateHybridRetriever durRetriever(WeaviateClient client) {
-        String where = null; // 예: "where: { path: [\"source\"], operator: Equal, valueText: \"effect\" }"
         return new WeaviateHybridRetriever(
                 client,
                 "DurRule",
                 List.of("content"),
                 List.of("content"),
                 SELECT_BASE,
-                where,
                 0.3,
                 embeddingModel
         );
@@ -56,11 +51,10 @@ public class RetrieverConfig {
     public WeaviateHybridRetriever doseRetriever(WeaviateClient client) {
         return new WeaviateHybridRetriever(
                 client,
-                "DoseDoc",
+                "DoseInfo",
                 List.of("content"),
                 List.of("content"),
                 SELECT_BASE,
-                null,
                 0.4,
                 embeddingModel
         );
