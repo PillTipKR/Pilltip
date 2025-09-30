@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +49,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -61,6 +63,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -121,6 +124,7 @@ import com.pilltip.pilltip.model.search.DetailDrugData
 import com.pilltip.pilltip.model.search.LogViewModel
 import com.pilltip.pilltip.model.search.ReviewViewModel
 import com.pilltip.pilltip.model.search.SearchHiltViewModel
+import com.pilltip.pilltip.ui.theme.backgroundColor
 import com.pilltip.pilltip.ui.theme.gray050
 import com.pilltip.pilltip.ui.theme.gray100
 import com.pilltip.pilltip.ui.theme.gray200
@@ -148,9 +152,14 @@ fun SearchPage(
     searchViewModel: SearchHiltViewModel
 ) {
     var inputText by remember { mutableStateOf("") }
+    var selected by remember { mutableIntStateOf(0) }
     val recentSearches by logViewModel.recentSearches.collectAsState()
+    //의약품
     val autoCompleted by searchViewModel.autoCompleted.collectAsState()
     val isLoading by searchViewModel.isAutoCompleteLoading.collectAsState()
+    //건기식
+    val supplementAutoCompleted by searchViewModel.supplementAutoCompleted.collectAsState()
+    val isSuppLoading by searchViewModel.isSupplementAutoCompleteLoading.collectAsState()
     BackHandler {
         navController.navigate("PillMainPage") {
             popUpTo("PillMainPage") {
@@ -161,13 +170,15 @@ fun SearchPage(
     }
 
     LaunchedEffect(Unit) {
-        snapshotFlow { inputText }
+        snapshotFlow { inputText to selected }
             .debounce(700)
             .distinctUntilChanged()
-            .filter { it.isNotEmpty() }
-            .collect { debouncedText ->
-                if (debouncedText.isNotBlank()) {
+            .filter { (text, _) -> text.isNotBlank() }
+            .collect { (debouncedText, tab) ->
+                if (tab == 0) {
                     searchViewModel.fetchAutoComplete(debouncedText, reset = true)
+                } else {
+                    searchViewModel.fetchSupplementAutoComplete(debouncedText, reset = true)
                 }
             }
     }
@@ -200,6 +211,68 @@ fun SearchPage(
                 Log.d("Query: ", query)
             }
         )
+        HeightSpacer(14.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(57.dp)
+                .background(Color(0xFFFDFDFD))
+        ) {
+            Column(
+                modifier = Modifier.weight(1f).noRippleClickable { selected = 0 }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "의약품",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontFamily = pretendard,
+                            fontWeight = FontWeight(600),
+                            color = if(selected == 0) gray800 else gray300,
+                        )
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    thickness = if(selected == 0) 1.5.dp else 1.0.dp,
+                    color = if(selected == 0) gray800 else gray200
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f).noRippleClickable { selected = 1 }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "건강기능식품",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontFamily = pretendard,
+                            fontWeight = FontWeight(600),
+                            color = if(selected == 1) gray800 else gray300,
+                        )
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    thickness = if(selected == 1) 1.5.dp else 1.0.dp,
+                    color = if(selected == 1) gray800 else gray200
+                )
+            }
+        }
         HeightSpacer(28.dp)
         if (inputText.isEmpty()) {
             Row(
@@ -248,25 +321,45 @@ fun SearchPage(
                 }
             }
         } else {
+            val searched = if (selected == 0) autoCompleted else supplementAutoCompleted
+            val loading = if (selected == 0) isLoading else isSuppLoading
+
             Box(modifier = Modifier.fillMaxSize()) {
                 AutoCompleteList(
                     query = inputText,
-                    searched = autoCompleted,
-                    onClick = { selected ->
-                        inputText = selected.value
-                        searchViewModel.fetchDrugSearch(selected.value)
-                        logViewModel.addSearchQuery(selected.value)
-                        navController.navigate("SearchResultsPage/${selected.value}") {
-                            popUpTo("MainPage") { inclusive = false }
-                            launchSingleTop = true
+                    searched = searched,
+                    onClick = { item ->
+                        inputText = item.value
+                        logViewModel.addSearchQuery(item.value)
+
+                        if (selected == 0) {
+                            // 의약품 검색
+                            searchViewModel.fetchDrugSearch(item.value)
+                            navController.navigate("SearchResultsPage/${item.value}") {
+                                popUpTo("MainPage") { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        } else {
+                            // 건기식 결과 화면 라우팅 (둘 중 하나로 맞춰 써줘)
+                            // 1) 별도 페이지:
+                            // navController.navigate("SupplementResultsPage/${item.value}") { ... }
+                            // 2) 같은 페이지 + 쿼리 파라미터:
+                            navController.navigate("SearchResultsPage/${item.value}?type=supplement") {
+                                popUpTo("MainPage") { inclusive = false }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onLoadMore = {
-                        searchViewModel.fetchAutoComplete(inputText)
+                        if (selected == 0) {
+                            searchViewModel.fetchAutoComplete(inputText)
+                        } else {
+                            searchViewModel.fetchSupplementAutoComplete(inputText)
+                        }
                     }
                 )
 
-                if (isLoading) {
+                if (loading) {
                     HeightSpacer(40.dp)
                     CircularProgressIndicator(
                         modifier = Modifier
@@ -277,7 +370,7 @@ fun SearchPage(
                     )
                 }
 
-                if (!isLoading && autoCompleted.isEmpty()) {
+                if (!loading && searched.isEmpty()) {
                     HeightSpacer(40.dp)
                     Text(
                         text = "검색 결과가 없어요",

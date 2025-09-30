@@ -33,15 +33,22 @@ import javax.inject.Singleton
  * 약품명 자동완성 API
  * */
 interface AutoCompleteApi {
-    @GET("/api/autocomplete/drugs")
+    @GET("/api/autocomplete/drugs") // 약품
     suspend fun getAutoCompleteDatas(
         @Query("input") input: String,
         @Query("page") page: Int
     ): SearchResponse
+
+    @GET("/api/autocomplete/supplements") // 건기식
+    suspend fun getSupplementAutoCompleteDatas(
+        @Query("input") input: String,
+        @Query("page") page: Int
+    ): SupplementAutoCompleteResponse
 }
 
 interface AutoCompleteRepository {
     suspend fun getAutoComplete(query: String, page: Int = 0): List<SearchData>
+    suspend fun getSupplementAutoComplete(query: String, page: Int = 0): List<SearchData>
 }
 
 class AutoCompleteRepositoryImpl(
@@ -49,6 +56,10 @@ class AutoCompleteRepositoryImpl(
 ) : AutoCompleteRepository {
     override suspend fun getAutoComplete(query: String, page: Int): List<SearchData> {
         return api.getAutoCompleteDatas(query, page).data
+    }
+
+    override suspend fun getSupplementAutoComplete(query: String, page: Int): List<SearchData> {
+        return api.getSupplementAutoCompleteDatas(query, page).data
     }
 }
 
@@ -728,7 +739,7 @@ class AgentChatRepositoryImpl @Inject constructor(
 ) : AgentChatRepository {
 
     override fun runAgent(userText: String, session: Int): Flow<AgentUiEvent> = callbackFlow {
-        val url = retrofit.baseUrl().toString() + "/api/agent/run"
+        val url = retrofit.baseUrl().toString() + "api/agent/run"
         val json = gson.toJson(AgentRunRequest(userText, session))
         val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
 
@@ -743,69 +754,85 @@ class AgentChatRepositoryImpl @Inject constructor(
             .build()
 
         val listener = object : EventSourceListener() {
-            override fun onOpen(eventSource: EventSource, response: okhttp3.Response) {
-                // 연결 성공
-            }
-
-            override fun onEvent(
-                eventSource: EventSource,
-                id: String?,
-                type: String?,
-                data: String
-            ) {
-                // SSE 프레임의 data: ... 부분이 data 인자로 들어온다.
-                // 1) 우선 JSON으로 파싱을 시도
+            override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
                 val uiEvent = try {
                     val parsed = gson.fromJson(data, RawStreamEvent::class.java)
 
-                    // 서버가 event 필드를 채워 보내면 OkHttp가 type 인자로 줌.
-                    // 그게 없다면 parsed.type을 보고 매핑.
-                    when ((type ?: parsed.type)?.lowercase()) {
-                        "status" -> {
-                            val msg = parsed.message ?: parsed.data ?: ""
-                            AgentUiEvent.Status(parsed.code, msg.ifEmpty { "상태 갱신" })
+                    // ★ 핵심: JSON type 우선 → 서버가 의도한 논리 타입을 먼저 신뢰
+                    val sseType  = type?.lowercase()           // e.g., "agent" (상위 라벨)
+                    val jsonType = parsed.type?.lowercase()    // e.g., "status", "answer_chunk", "final"
+                    val lowerType = (jsonType ?: sseType)      // ★ JSON > SSE
+
+                    val isChunk = lowerType in setOf(
+                        "token","delta","answer_delta","chunk","answer_chunk"
+                    ) || (parsed.code?.equals("CHUNK", ignoreCase = true) == true)
+
+                    when {
+                        lowerType == "status" -> {
+                            AgentUiEvent.Status(
+                                parsed.code,
+                                (parsed.message ?: parsed.data).orEmpty().ifEmpty { "상태 갱신" }
+                            )
                         }
-                        "token", "delta", "answer_delta", "chunk" -> {
-                            val token = parsed.data ?: parsed.message ?: ""
-                            AgentUiEvent.Token(token)
+                        isChunk -> {
+                            AgentUiEvent.Token((parsed.data ?: parsed.message).orEmpty())
                         }
-                        "final", "complete", "answer_final", "done" -> {
-                            val text = parsed.data ?: parsed.message ?: ""
-                            AgentUiEvent.Final(text)
+                        lowerType in setOf("final","complete","answer_final","done") -> {
+                            AgentUiEvent.Final((parsed.data ?: parsed.message).orEmpty())
                         }
-                        "tool_result", "tool" -> {
+                        lowerType in setOf("tool_result","tool") -> {
                             AgentUiEvent.ToolResult(parsed.code, parsed.data ?: parsed.message)
                         }
-                        "error" -> {
-                            val msg = parsed.message ?: "알 수 없는 오류"
-                            AgentUiEvent.Error(msg)
+                        lowerType == "error" -> {
+                            AgentUiEvent.Error(parsed.message ?: "알 수 없는 오류")
                         }
                         else -> {
-                            // 타입이 없고, data가 그냥 텍스트일 수도 있다 → 델타로 처리
+                            // ★ 추가 방어: 혹시라도 JSON에 type=status가 들어있는데 위에서 못 잡았을 때
                             val asObj = runCatching { gson.fromJson(data, JsonObject::class.java) }.getOrNull()
-                            val fallback = asObj?.get("data")?.asString ?: asObj?.get("message")?.asString ?: data
-                            AgentUiEvent.Token(fallback)
+                            val maybeType = asObj?.get("type")?.asString?.lowercase()
+                            when (maybeType) {
+                                "status" -> AgentUiEvent.Status(
+                                    asObj.get("code")?.asString,
+                                    asObj.get("message")?.asString ?: asObj.get("data")?.asString ?: "상태 갱신"
+                                )
+                                "final","complete","answer_final","done" -> AgentUiEvent.Final(
+                                    asObj.get("data")?.asString ?: asObj.get("message")?.asString ?: ""
+                                )
+                                "tool_result","tool" -> AgentUiEvent.ToolResult(
+                                    asObj.get("code")?.asString,
+                                    asObj.get("data")?.asString ?: asObj.get("message")?.asString
+                                )
+                                "token","delta","answer_delta","chunk","answer_chunk","chunk_data" -> AgentUiEvent.Token(
+                                    asObj.get("data")?.asString ?: asObj.get("message")?.asString ?: ""
+                                )
+                                else -> {
+                                    // 정말 미분류면 답변 말풍선에 섞이지 않도록 빈 토큰으로 처리
+                                    AgentUiEvent.Token("")
+                                }
+                            }
                         }
                     }
                 } catch (_: Throwable) {
-                    // data가 순수 텍스트면 그대로 델타로 취급
+                    // 파싱이 완전히 실패한 경우에만 원시 data를 토큰으로
                     AgentUiEvent.Token(data)
                 }
 
-                trySend(uiEvent)
+                // ★ 빈 토큰은 버려서 상태 문구가 말풍선에 섞이는 걸 방지
+                val shouldDropEmptyToken = uiEvent is AgentUiEvent.Token && uiEvent.text.isBlank()
+                if (!shouldDropEmptyToken) {
+                    trySend(uiEvent)
+                }
             }
 
             override fun onClosed(eventSource: EventSource) {
+                // ★ 서버가 final 안 보내고 끊어도 UI가 마무리되도록 신호 보냄
+                trySend(AgentUiEvent.Final(""))
                 close()
             }
 
-            override fun onFailure(
-                eventSource: EventSource,
-                t: Throwable?,
-                response: okhttp3.Response?
-            ) {
-                trySend(AgentUiEvent.Error(t?.message ?: "SSE 연결 실패")).isSuccess
-                close(t)
+            override fun onFailure(eventSource: EventSource, t: Throwable?, response: okhttp3.Response?) {
+                trySend(AgentUiEvent.Error(t?.message ?: "SSE 연결 실패"))
+                close() // close(t) 말고 그냥 close
             }
         }
 

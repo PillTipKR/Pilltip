@@ -151,7 +151,20 @@ fun PillMainPage(
                 onTabSelected = { selectedTab = it }
             )
         },
-        containerColor = backgroundColor
+        containerColor = backgroundColor,
+        floatingActionButton = {
+            if (selectedTab == BottomTab.Home) {
+                Column(
+                    modifier = Modifier
+                        .clip(shape = RoundedCornerShape(16.dp))
+                        .background(color = primaryColor, shape = RoundedCornerShape(16.dp))
+                        .noRippleClickable { navController.navigate("ChatbotPage") }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ){
+                    Text("챗봇", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -198,16 +211,6 @@ fun HomePage(
     val inviteUrl by searchHiltViewModel.inviteUrl.collectAsState()
     var link by remember { mutableStateOf("") }
     var nickname = UserInfoManager.getUserData(context)?.nickname
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomEnd
-    ){
-        Column(
-            modifier = Modifier.clip(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)).noRippleClickable { navController.navigate("ChatbotPage") }
-        ){
-            Text("챗봇")
-        }
-    }
     SideEffect {
         systemUiController.setStatusBarColor(
             color = Color(0xFFF1F6FE),

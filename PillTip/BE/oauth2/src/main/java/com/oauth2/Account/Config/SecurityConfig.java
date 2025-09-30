@@ -54,7 +54,7 @@ public class SecurityConfig {
                                 "/api/auth/refresh", "/api/auth/social-login", "/api/questionnaire/public/**",
                                 "/questionnaire/public/**",
                                 "/profile/**", "/api/friend/inviting/**", "/invite.html",
-                                "/api/questionnaire/qr-url/all", "/api/ml/**"
+                                "/api/questionnaire/qr-url/all", "/api/agent/run"
                         ).permitAll()
                         // 나머지 경로는 인증 필요
                         .anyRequest().authenticated()

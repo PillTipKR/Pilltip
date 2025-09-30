@@ -89,10 +89,12 @@ public class WeaviateController {
 
     @GetMapping("/retrieve/dose")
     public Map<String,Object> retrieveDose(
-            @RequestParam String q,
+            @RequestParam String name,
+            @RequestParam Integer age,
+            @RequestParam String gender,
             @RequestParam(required = false) Integer k
     ) {
-        var hits = ragSearchService.searchDose(q, k);
+        var hits = ragSearchService.searchDose(name,k,age,gender);
         return Map.of("count", hits.size(), "matches", hits);
     }
 

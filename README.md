@@ -1,7 +1,7 @@
 # 💊 Pilltip
 <img width="7680" height="4320" alt="34" src="https://github.com/user-attachments/assets/47538752-b8fa-46c1-9f76-7621ca8e7670" />
 
-## Pilltip | 당신만의 개인맞춤 AI 복약관리
+## Pilltip | 당신만의 개인맞춤 AI 안전복약 솔루션
 
 Pilltip은 고령화 사회, 의료 정보 격차, 개인정보 보호 등의 복약 관리와 관련된 사회적 문제를 해결하기 위해 기획된 애플리케이션 서비스입니다.
 
@@ -13,7 +13,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 
 ## 서비스 시연 영상
 <p align="center">
-  <a href="https://youtu.be/FZAfDYjt-C8">
+  <a href="https://youtu.be/IpjfK8htpEg?si=AtUsYJdtsLTs1Iy-">
     <img src="https://github.com/user-attachments/assets/acf08b38-7677-4f70-9eb6-44eb7b047346" width="10%" alt="서비스 시연 영상">
   </a>
 </p>
@@ -29,7 +29,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
   - 우수사례 선정 및 전시부스 운영
   - 코엑스 (그랜드볼룸, 아셈볼룸, 오디토리움) 전시
 ### Busan Dataweek 2025 데이터활용 우수사례 공모전
-  - 우수사례 선정
+  - 우수사례 선정 및 최우수상(1등상, 부산광역시장상) 수상
   - 벡스코 제2전시장 4A홀 전시
 ### Google.org AI 커리어스쿨 창업톤 L:AUNCH
   - 현재 본선 진출
@@ -132,5 +132,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 
 Copyright 2025 '**Pilltip**' All right reserved.
 본 레포지토리 내 코드 또는 작업물의 무단 복제 및 사전 동의 없는 활용을 금합니다.
+
+
 
 

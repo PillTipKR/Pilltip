@@ -24,7 +24,6 @@ public class WeaviateHybridRetriever implements DocumentRetriever {
     private final List<String> bm25Props;     // e.g. ["content"] or ["effectText"]
     private final List<String> textFieldCandidates;
     private final String selectFields;        // e.g. "content metadata _additional { id score distance }"
-    private final String whereClause;         // e.g. "where: { path: [\"source\"], operator: Equal, valueText: \"effect\" }"
     private final double alpha;
     private final EmbeddingModel embeddingModel;
 
@@ -44,9 +43,13 @@ public class WeaviateHybridRetriever implements DocumentRetriever {
         }
         final String propsArg = props.isEmpty() ? "" : ", properties: [" + quoteJoin(props) + "]";
 
-        // where
-        final String whereLine = (whereClause != null && !whereClause.isBlank())
-                ? (whereClause.trim().startsWith("where:") ? whereClause.trim() + "," : "where: " + whereClause.trim() + ",")
+        // where (동적으로 변경된 부분)
+        // 1. Query의 context에서 'filter' 키로 동적 필터 문자열을 가져옵니다.
+        String dynamicFilter = (ctx.get("filter") instanceof String s) ? s : null;
+
+        // 2. 동적 필터가 있을 경우에만 whereLine을 구성합니다.
+        final String whereLine = (dynamicFilter != null && !dynamicFilter.isBlank())
+                ? "where: " + dynamicFilter + "," // Weaviate GraphQL 형식에 맞게
                 : "";
 
         // 쿼리 벡터 (vectorizer:none 해결 포인트)
