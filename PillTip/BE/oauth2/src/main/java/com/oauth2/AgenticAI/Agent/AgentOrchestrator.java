@@ -29,6 +29,7 @@ import org.springframework.ai.chat.model.StreamingChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
+import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.*;
@@ -71,18 +72,21 @@ public class AgentOrchestrator {
             
             - [DoseInfoTool 규칙]
               - 사용자가 '섭취량', '복용량', '권장량' 등을 물어보면 DoseInfoTool을 사용해야 합니다.
-              - 사용자의 질문에서 **'영양소/제품 이름'과 '나이'를 명확히 분리하여 각각 `nutrient`와 `age` 파라미터에 전달**해야 합니다.
+              - 사용자의 질문에서 **'영양소/제품 이름'과 '나이', '상태'를 명확히 분리하여 각각 `nutrient', `age`, 'status' 파라미터에 전달**해야 합니다.
             
                 [호출 예시]
-                1. 사용자 입력: "11살 비타민D 하루 권장량 알려줘"
-                   올바른 Tool 호출: DoseInfoTool(nutrient="비타민D 하루 권장량", age="11살")
+                1. 사용자 입력: "11살 남자아이 비타민D 하루 권장량 알려줘"
+                   올바른 Tool 호출: DoseInfoTool(nutrient="비타민D", age="11살", status="남자")
             
-                2. 사용자 입력: "초등학생 아들 철분 섭취량"
-                   올바른 Tool 호출: AskUserTool호출 // 나이가 모호하므로 정확히 물어보기.
+                2. 사용자 입력: "초등학생 아이 철분 섭취량"
+                   올바른 Tool 호출: AskUserTool호출 // 나이와 성별이 모호하므로 정확히 물어보기.
+           
+                3. 사용자 입력 : "임산부 비타민A 섭취량"
+                    올바른 Tool 호출: DoseInfoTool(nutrient="비타민A", age="20-60세", status="임산부")
             
             [대화 연속성 규칙]
-            - 이전 대화에서 사용자에게 정보를 물어봤고, 사용자가 그에 대한 답변(예: 나이, 학년, 개월 수)만 간단히 제공하면, 그 새로운 정보를 **이전 대화의 맥락과 결합하여** 원래 호출하려던 도구를 다시 호출해야 합니다.
-              - 예시: 제가 "몇 학년인가요?"라고 물은 뒤 사용자가 "5학년이요"라고 답하면, 이전 대화의 '비타민C'와 결합하여 `DoseInfoTool(nutrient="비타민C",age="11살")`를 호출해야 합니다.
+            - 이전 대화에서 사용자에게 정보를 물어봤고, 사용자가 그에 대한 답변(예: 나이, 학년, 개월 수, 성별,임산부,수유부)만 간단히 제공하면, 그 새로운 정보를 **이전 대화의 맥락과 결합하여** 원래 호출하려던 도구를 다시 호출해야 합니다.
+              - 예시: 제가 이전 대화에서 "초등학생"이라는 정보와 "비타민D"라는 정보를 얻은 상태에서, "몇 학년이고 성별이 어떻게 되나요?"라고 물은 뒤 사용자가 "5학년이고 남자아이에요"라고 답하면, 이전 대화의 '비타민C'와 결합하여 `DoseInfoTool(nutrient="비타민C",age="11살",gender="남자")`를 호출해야 합니다.
             
             지원 범위:
             - 제품/성분 후보 찾기(ProductRagTool), DUR 상호작용/금기/주의 정보 알림(DurTool), 섭취량 관련 정보 알림(DoseInfoTool), 추가질문(AskUserTool)
@@ -143,295 +147,264 @@ public class AgentOrchestrator {
     private enum AnswerMode { RECAP, DUR_INFO, DOSE_INFO }
 
     public Flux<StreamEvent> run(String session, String userText, Long userId, String nick) {
+
         // 0) 히스토리 적재
         memory.appendUser(session, userText == null ? "" : userText);
 
-        // 1) 1단계(툴 전용) 프롬프트 구성
+        // 1) 프롬프트 구성 (동일)
         var msgs = new ArrayList<Message>();
         msgs.add(new SystemMessage(SYS_BASE));
         String sum = memory.summary(session);
         if (sum != null && !sum.isBlank()) msgs.add(new SystemMessage("대화요약: " + sum));
         msgs.addAll(memory.recentTurns(session, 30));
         msgs.add(new UserMessage(userText == null ? "" : userText));
-        System.out.println("sum"+sum);
-        // 2) 툴 콜백 + 자동실행 OFF (플래닝 전용 옵션: detectOpts)
-        ToolCallback[] callbacks = ToolCallbacks.from(
-                askUserTool, doseInfoTool, productRagTool, durTool
-        );
+
+        ToolCallback[] callbacks = ToolCallbacks.from(askUserTool, doseInfoTool, productRagTool, durTool);
         var detectOpts = OpenAiChatOptions.builder()
-                .internalToolExecutionEnabled(false)   // 플래닝만
-                .parallelToolCalls(true)               // 동시 툴 계획 허용
+                .internalToolExecutionEnabled(false)
+                .parallelToolCalls(true)
                 .toolCallbacks(callbacks)
                 .build();
-        System.out.println("make detect");
-        return Flux.defer(() -> {
-            var head   = List.of(StreamEvent.status(EventCode.INTENT_DETECTED, "질문 의도를 파악했어요."));
-            var events = new ArrayList<StreamEvent>(); // 단계별 상태 문구
 
-            List<Message> history = new ArrayList<>(msgs);
-            System.out.println(history);
-            ChatResponse resp = chatModel.call(new Prompt(history, detectOpts));
-            System.out.println("make resp");
-            // DUR 결과 집계에 필요한 변수
-            int topK = 0;
-            int safeCount = 0;
-            List<Map<String,Object>> safeItems = new ArrayList<>(); // [{id,name,effect,meta?}]
-            Map<String, Map<String,Object>> candidateById = new HashMap<>();
-            Map<String, String> doseInfo = new HashMap<>();
-            DurAnalysisResponse durInfoJsonResponse = null;
+        // ✅ 발생 즉시 이벤트 밀어내기
+        return Flux.create((FluxSink<StreamEvent> sink) -> {
+                    try {
+                        // head 이벤트 즉시 발행
+                        sink.next(StreamEvent.status(EventCode.INTENT_DETECTED, "질문 의도를 파악했어요."));
 
-            List<String> executedTools = new ArrayList<>();
+                        List<Message> history = new ArrayList<>(msgs);
 
-            var planned = safePlannedToolNames(resp);
+                        ChatResponse resp = chatModel.call(new Prompt(history, detectOpts));
 
-            if (planned.contains("ProductRagTool")) {
+                        // DUR 집계 변수들 (동일)
+                        int topK = 0;
+                        int safeCount = 0;
+                        List<Map<String,Object>> safeItems = new ArrayList<>();
+                        Map<String, Map<String,Object>> candidateById = new HashMap<>();
+                        Map<String, String> doseInfo = new HashMap<>();
+                        DurAnalysisResponse durInfoJsonResponse = null;
+                        List<String> executedTools = new ArrayList<>();
 
-                // --- 1. 제품 탐색 단계 ---
-                events.add(StreamEvent.status(EventCode.PRODUCT_SEARCH_START, "제품을 탐색 중이에요."));
+                        var planned = safePlannedToolNames(resp);
 
-                ToolExecutionResult ragExec = null;
-                try {
-                    if (userId != null) SessionUtils.set(session, userId, nick);
-                    // ProductRagTool만 지정해서 실행
-                    ragExec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
-                } catch(Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    SessionUtils.clear();
-                }
+                        // ----- ProductRagTool -----
+                        if (planned.contains("ProductRagTool")) {
+                            sink.next(StreamEvent.status(EventCode.PRODUCT_SEARCH_START, "제품을 탐색 중이에요."));
+                            ToolExecutionResult ragExec = null;
+                            try {
+                                if (userId != null) SessionUtils.set(session, userId, nick);
+                                ragExec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
+                            } catch (Exception e) {
+                                sink.error(e);
+                                return;
+                            } finally {
+                                SessionUtils.clear();
+                            }
+                            if (ragExec == null) {
+                                sink.next(StreamEvent.error(EventCode.BAD_REQUEST, "ProductRagTool 실행에 실패했습니다."));
+                                sink.complete();
+                                return;
+                            }
 
-                if (ragExec == null) {
-                    // 에러 상황이므로 더 이상 진행하지 않고 Flux를 반환해야 할 수 있습니다.
-                    return Flux.just(StreamEvent.error(EventCode.BAD_REQUEST, "ProductRagTool 실행에 실패했습니다."));
-                }
+                            history = new ArrayList<>(ragExec.conversationHistory());
 
-                history = new ArrayList<>(ragExec.conversationHistory());
+                            String ragJsonResponse = "";
+                            Message lastMessage = history.get(history.size() - 1);
+                            if (lastMessage instanceof ToolResponseMessage trm) {
+                                ragJsonResponse = trm.getResponses().get(0).responseData();
+                            }
+                            executedTools.add("ProductRagTool");
 
-                String ragJsonResponse = "";
-                Message lastMessage = history.get(history.size() - 1);
-                if (lastMessage instanceof ToolResponseMessage trm) {
-                    ragJsonResponse = trm.getResponses().get(0).responseData();
-                }
+                            Map<String,Object> body = parseMap(ragJsonResponse);
+                            List<Map<String,Object>> candidatesAsMap = getList(body, "candidates");
 
-                executedTools.add("ProductRagTool");
+                            if (!candidatesAsMap.isEmpty()) {
+                                topK = candidatesAsMap.size();
+                                for (Map<String,Object> c : candidatesAsMap) {
+                                    String id = String.valueOf(c.getOrDefault("id",""));
+                                    candidateById.put(id, c);
+                                }
+                            }
+                            // ✅ 결과 즉시
+                            sink.next(StreamEvent.status(EventCode.PRODUCT_SEARCH_RESULT, "후보 제품을 찾았어요."));
 
-                Map<String,Object> body = parseMap(ragJsonResponse);
-                List<Map<String,Object>> candidatesAsMap = getList(body, "candidates");
+                            // DUR(Legacy 필터 도구 직접 호출)
+                            sink.next(StreamEvent.status(EventCode.DUR_CHECK_START, "복용 상호작용(DUR)을 확인 중이에요."));
+                            String durJsonResponse = "{}";
+                            DurFilterResult dr = new DurFilterResult(List.of(), 0);
+                            try {
+                                if (userId != null) SessionUtils.set(session, userId, nick);
+                                List<ProductCandidate> productCandidates = new ArrayList<>();
+                                for (Map<String, Object> map : candidatesAsMap) {
+                                    String id = String.valueOf(map.getOrDefault("id", ""));
+                                    String name = String.valueOf(map.getOrDefault("name", ""));
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> meta = (map.get("meta") instanceof Map)
+                                            ? (Map<String, Object>) map.get("meta")
+                                            : new HashMap<>();
+                                    productCandidates.add(new ProductCandidate(id, name, meta));
+                                }
+                                var durRequest = new DurFilterRequest(productCandidates);
+                                dr = durFilterTool.filter(durRequest);
+                                durJsonResponse = objectMapper.writeValueAsString(dr);
+                            } catch (Exception e) {
+                                sink.error(e);
+                                return;
+                            } finally {
+                                SessionUtils.clear();
+                            }
 
-                if (!candidatesAsMap.isEmpty()) {
-                    topK = candidatesAsMap.size();
-                    for (Map<String,Object> c : candidatesAsMap) {
-                        String id = String.valueOf(c.getOrDefault("id",""));
-                        candidateById.put(id, c);
-                    }
-                }
-                events.add(StreamEvent.status(EventCode.PRODUCT_SEARCH_RESULT, "후보 제품을 찾았어요."));
+                            try {
+                                String durToolCallId = findToolCallId(resp, "DurFilterTool");
+                                if (durToolCallId == null) {
+                                    durToolCallId = "manual_tool_call_" + UUID.randomUUID().toString().replace("-", "");
+                                }
+                                ToolResponseMessage durToolResponse = new ToolResponseMessage(List.of(
+                                        new ToolResponseMessage.ToolResponse(durToolCallId, "DurFilterTool", durJsonResponse)
+                                ));
+                                history.add(durToolResponse);
+                            } catch (Exception e) {
+                                sink.error(e);
+                                return;
+                            }
 
+                            executedTools.add("DurFilterTool");
 
-                // --- 2. DUR 상호작용 검색 단계 (LLM 개입 없이 직접 실행) ---
-                events.add(StreamEvent.status(EventCode.DUR_CHECK_START, "복용 상호작용(DUR)을 확인 중이에요."));
+                            safeCount = dr.count();
+                            List<Map<String, Object>> tmp = getMaps(dr);
+                            if (!tmp.isEmpty()) safeItems = tmp;
 
-                String durJsonResponse = "{}";
-                DurFilterResult dr = new DurFilterResult(List.of(), 0);
-                try {
-                    if (userId != null) SessionUtils.set(session, userId, nick); // Set context again
-                    List<ProductCandidate> productCandidates = new ArrayList<>();
-                    for (Map<String, Object> map : candidatesAsMap) {
-                        String id = String.valueOf(map.getOrDefault("id", ""));
-                        String name = String.valueOf(map.getOrDefault("name", ""));
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> meta = (map.get("meta") instanceof Map)
-                                ? (Map<String, Object>) map.get("meta")
-                                : new HashMap<>();
-                        productCandidates.add(new ProductCandidate(id, name, meta));
-                    }
+                            // ✅ DUR 결과 즉시
+                            sink.next(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
 
-                    var durRequest = new DurFilterRequest(productCandidates);
-                    dr = durFilterTool.filter(durRequest);
+                            // ragExec 대화 히스토리로 복원
+                            history = new ArrayList<>(ragExec.conversationHistory());
+                        }
 
-                    durJsonResponse = objectMapper.writeValueAsString(dr);
+                        // ----- DurTool -----
+                        if (planned.contains("DurTool")) {
+                            sink.next(StreamEvent.status(EventCode.DUR_CHECK_START, "복용 상호작용(DUR)을 확인 중이에요."));
+                            ToolExecutionResult durexec = null;
+                            try {
+                                if (userId != null) SessionUtils.set(session, userId, nick);
+                                durexec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
+                            } catch (Exception e) {
+                                sink.error(e);
+                                return;
+                            } finally {
+                                SessionUtils.clear();
+                            }
 
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                            if (durexec == null) {
+                                sink.next(StreamEvent.error(EventCode.BAD_REQUEST, "DurTool 실행에 실패했습니다."));
+                                sink.complete();
+                                return;
+                            }
 
-                try {
-                    // LLM이 초기에 계획했던 ToolCall에서 'id'를 찾아옵니다.
-                    // OpenAI API 규칙을 맞추기 위해 이 'id'가 필요합니다.
-                    String durToolCallId = findToolCallId(resp, "DurFilterTool");
-                    if(durToolCallId == null) {
-                        // 만약 LLM이 DurFilterTool을 계획하지 않았다면 임의의 ID를 생성합니다.
-                        durToolCallId = "manual_tool_call_" + UUID.randomUUID().toString().replace("-", "");
-                    }
+                            history = new ArrayList<>(durexec.conversationHistory());
+                            Message lastMessage = history.get(history.size() - 1);
+                            if (lastMessage instanceof ToolResponseMessage trm) {
+                                var conv = new BeanOutputConverter<>(DurAnalysisResponse.class);
+                                durInfoJsonResponse = conv.convert(trm.getResponses().get(0).responseData());
+                                executedTools.add("DurTool");
+                                sink.next(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
+                            }
+                        }
 
-                    ToolResponseMessage durToolResponse = new ToolResponseMessage(List.of(
-                            new ToolResponseMessage.ToolResponse(durToolCallId, "DurFilterTool", durJsonResponse)
-                    ));
-                    history.add(durToolResponse);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                        // ----- DoseInfoTool -----
+                        if (planned.contains("DoseInfoTool")) {
+                            sink.next(StreamEvent.status(EventCode.DOSE_INFO_CHECK_START, "섭취량 정보를 확인 중이에요."));
+                            ToolExecutionResult doseExec = null;
+                            try {
+                                if (userId != null) SessionUtils.set(session, userId, nick);
+                                doseExec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
+                            } catch (Exception e) {
+                                sink.error(e);
+                                return;
+                            } finally {
+                                SessionUtils.clear();
+                            }
 
-                executedTools.add("DurFilterTool");
+                            if (doseExec == null) {
+                                sink.next(StreamEvent.error(EventCode.BAD_REQUEST, "DoseInfoTool 실행에 실패했습니다."));
+                                sink.complete();
+                                return;
+                            }
 
-                safeCount = dr.count();
-                // safeItems를 effect를 포함한 Map 리스트로 변환
-                List<Map<String, Object>> tmp = getMaps(dr);
-                if (!tmp.isEmpty()) safeItems = tmp;
+                            history = new ArrayList<>(doseExec.conversationHistory());
 
-                events.add(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
-                history = new ArrayList<>(ragExec.conversationHistory());
-            }
-            if(planned.contains("DurTool")){
-                // --- 1. 제품 탐색 단계 ---
-                events.add(StreamEvent.status(EventCode.DUR_CHECK_START, "복용 상호작용(DUR)을 확인 중이에요."));
+                            String doseJsonResponse = "";
+                            Message lastMessage = history.get(history.size() - 1);
+                            if (lastMessage instanceof ToolResponseMessage trm) {
+                                doseJsonResponse = trm.getResponses().get(0).responseData();
+                            }
+                            executedTools.add("DoseInfoTool");
 
-                ToolExecutionResult durexec = null;
-                try {
-                    if (userId != null) SessionUtils.set(session, userId, nick);
-                    // ProductRagTool만 지정해서 실행
-                    durexec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
-                } catch(Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    SessionUtils.clear();
-                }
+                            Map<String,Object> body = parseMap(doseJsonResponse);
+                            if (!body.isEmpty()) {
+                                Map<String,Object> meta = getMap(body,"meta");
+                                doseInfo.put("name", String.valueOf(meta.getOrDefault("name","")));
+                                doseInfo.put("gender", String.valueOf(meta.getOrDefault("gender","")));
+                                doseInfo.put("min", String.valueOf(meta.getOrDefault("min","")));
+                                doseInfo.put("max", String.valueOf(meta.getOrDefault("max","")));
+                                doseInfo.put("recommend", String.valueOf(meta.getOrDefault("recommend","")));
+                                doseInfo.put("enough", String.valueOf(meta.getOrDefault("enough","")));
+                                doseInfo.put("unit", String.valueOf(meta.getOrDefault("unit","")));
+                            }
+                            doseInfo.put("age", String.valueOf(body.get("age")));
 
-                if (durexec == null) {
-                    // 에러 상황이므로 더 이상 진행하지 않고 Flux를 반환해야 할 수 있습니다.
-                    return Flux.just(StreamEvent.error(EventCode.BAD_REQUEST, "DurTool 실행에 실패했습니다."));
-                }
+                            // ✅ 섭취량 결과 즉시
+                            sink.next(StreamEvent.status(EventCode.DOSE_INFO_CHECK_RESULT, "섭취량 정보를 찾았어요."));
+                        }
 
-                history = new ArrayList<>(durexec.conversationHistory());
-                Message lastMessage = history.get(history.size() - 1);
-                if (lastMessage instanceof ToolResponseMessage trm) {
-                    var conv = new BeanOutputConverter<>(DurAnalysisResponse.class);
-                    // conv.getFormat()을 프롬프트/툴 포맷 힌트로 넣고…
-                    assert trm.getText() != null;
-                    durInfoJsonResponse = conv.convert(trm.getResponses().get(0).responseData());
+                        // ----- 툴콜 없을 때 -----
+                        if (!hasToolCalls(resp)) {
+                            String draft = Optional.of(resp.getResult())
+                                    .map(Generation::getOutput).map(AssistantMessage::getText).orElse("").trim();
 
-                    executedTools.add("DurTool");
+                            if (draft.startsWith("REFUSAL:")) {
+                                String polite = draft.substring("REFUSAL:".length()).trim();
+                                sink.next(StreamEvent.status(EventCode.READY, "요청 범위를 확인했어요."));
+                                sink.next(StreamEvent.answer(polite));
+                                sink.next(StreamEvent.done());
+                                sink.complete();
+                                return;
+                            }
 
-                    events.add(StreamEvent.status(EventCode.DUR_CHECK_RESULT, "DUR 확인 결과를 정리하고 있어요."));
-                }
-            }
+                            var answerMsgs = new ArrayList<Message>(history);
+                            answerMsgs.add(new SystemMessage(SYS_ANSWER_RECAP));
+                            var answer = chatModel.call(new Prompt(
+                                    answerMsgs, OpenAiChatOptions.builder()
+                                    .internalToolExecutionEnabled(false)
+                                    .streamUsage(true).build()
+                            ));
+                            String finalText = Optional.ofNullable(answer.getResult())
+                                    .map(res -> res.getOutput().getText())
+                                    .orElse("");
 
-            if (planned.contains("DoseInfoTool")) {
+                            sink.next(StreamEvent.status(EventCode.READY, "답변을 정리했어요."));
+                            sink.next(StreamEvent.answer(finalText));
+                            sink.next(StreamEvent.done());
+                            sink.complete();
+                            return;
+                        }
 
-                // --- 1. 제품 탐색 단계 ---
-                events.add(StreamEvent.status(EventCode.DOSE_INFO_CHECK_START, "섭취량 정보를 확인 중이에요."));
+                        // ----- 2단계: 스트리밍 only -----
+                        var followupMsgs = new ArrayList<Message>(history);
+                        AnswerMode mode = pickMode(executedTools);
 
-                ToolExecutionResult doseExec = null;
-                try {
-                    if (userId != null) SessionUtils.set(session, userId, nick);
-                    // ProductRagTool만 지정해서 실행
-                    doseExec = toolManager.executeToolCalls(new Prompt(history, detectOpts), resp);
-                } catch(Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    SessionUtils.clear();
-                }
-
-                if (doseExec == null) {
-                    // 에러 상황이므로 더 이상 진행하지 않고 Flux를 반환해야 할 수 있습니다.
-                    return Flux.just(StreamEvent.error(EventCode.BAD_REQUEST, "DoseInfoTool 실행에 실패했습니다."));
-                }
-
-                history = new ArrayList<>(doseExec.conversationHistory());
-
-                String doseJsonResponse = "";
-                Message lastMessage = history.get(history.size() - 1);
-                if (lastMessage instanceof ToolResponseMessage trm) {
-                    doseJsonResponse = trm.getResponses().get(0).responseData();
-                }
-
-                executedTools.add("DoseInfoTool");
-
-                Map<String,Object> body = parseMap(doseJsonResponse);
-                System.out.println(body);
-                if (!body.isEmpty()) {
-                    Map<String,Object> meta = (Map<String, Object>) body.get("meta");
-                    String name = String.valueOf(meta.getOrDefault("name",""));
-                    String gender = String.valueOf(meta.getOrDefault("gender",""));
-                    String min = String.valueOf(meta.getOrDefault("min",""));
-                    String max = String.valueOf(meta.getOrDefault("max",""));
-                    String recommend = String.valueOf(meta.getOrDefault("recommend",""));
-                    String enough = String.valueOf(meta.getOrDefault("enough",""));
-                    String unit = String.valueOf(meta.getOrDefault("unit",""));
-                    doseInfo.put("name", name);
-                    doseInfo.put("gender", gender);
-                    doseInfo.put("min", min);
-                    doseInfo.put("max", max);
-                    doseInfo.put("recommend", recommend);
-                    doseInfo.put("enough", enough);
-                    doseInfo.put("unit", unit);
-                }
-                doseInfo.put("age", String.valueOf(body.get("age")));
-                events.add(StreamEvent.status(EventCode.DOSE_INFO_CHECK_RESULT, "섭취량 정보를 찾았어요."));
-            }
-
-            // 3) 툴콜이 전혀 없던 케이스 → 거절/단답 처리
-            if (!hasToolCalls(resp)) {
-                String draft = Optional.of(resp.getResult())
-                        .map(Generation::getOutput).map(AssistantMessage::getText).orElse("").trim();
-
-                if (draft.startsWith("REFUSAL:")) {
-                    String polite = draft.substring("REFUSAL:".length()).trim();
-                    return Flux.concat(
-                            Flux.fromIterable(head),
-                            Flux.fromIterable(events),
-                            Flux.just(
-                                    StreamEvent.status(EventCode.READY, "요청 범위를 확인했어요."),
-                                    StreamEvent.answer(polite),
-                                    StreamEvent.done()
-                            )
-                    );
-                }
-
-                var answerMsgs = new ArrayList<Message>(history);
-                answerMsgs.add(new SystemMessage(SYS_ANSWER_RECAP));
-                var answer = chatModel.call(new Prompt(
-                        answerMsgs, OpenAiChatOptions.builder()
-                        .internalToolExecutionEnabled(false)
-                        .streamUsage(true).build()
-                ));
-                String finalText = Optional.ofNullable(answer.getResult())
-                        .map(res -> res.getOutput().getText())
-                        .orElse("");
-
-                return Flux.concat(
-                        Flux.fromIterable(head),
-                        Flux.fromIterable(events),
-                        Flux.just(
-                                StreamEvent.status(EventCode.READY, "답변을 정리했어요."),
-                                StreamEvent.answer(finalText),
-                                StreamEvent.done()
-                        )
-                );
-            }
-
-            // 4) 2단계(답변 전용) 스트리밍 — 툴콜 금지, 말하기만
-            var followupMsgs = new ArrayList<Message>(history);      // 루프의 마지막 히스토리
-
-            // 모드 결정
-            AnswerMode mode = pickMode(executedTools);
-
-            if (mode.equals(AnswerMode.RECAP) && (topK > 0 || safeCount > 0 || !safeItems.isEmpty())) {
-                List<String> lines = new ArrayList<>();
-                int limit = Math.min(5, safeItems.size());
-                for (int i = 0; i < limit; i++) {
-                    Map<String,Object> it = safeItems.get(i);
-                    String name = String.valueOf(it.getOrDefault("name","이름없음"));
-                    String cat  = categoryOf(it, candidateById); // 일반의약품/건강기능식품/기타
-                    String effect = String.valueOf(it.getOrDefault("effect",""));
-                    lines.add("- [" + cat + "] " + name + (effect.isBlank() ? "" : " — " + effect));
-                }
-                String safeListBlock = String.join("\n", lines);
-
-                // topK가 0이면 safeCount로 대체 출력하도록 안내
-                int topKOrSafe = topK > 0 ? topK : Math.max(safeCount, lines.size());
-
-                String recap = """
+                        if (mode.equals(AnswerMode.RECAP) && (topK > 0 || safeCount > 0 || !safeItems.isEmpty())) {
+                            List<String> lines = new ArrayList<>();
+                            int limit = Math.min(5, safeItems.size());
+                            for (int i = 0; i < limit; i++) {
+                                Map<String,Object> it = safeItems.get(i);
+                                String name = String.valueOf(it.getOrDefault("name","이름없음"));
+                                String cat  = categoryOf(it, candidateById);
+                                String effect = String.valueOf(it.getOrDefault("effect",""));
+                                lines.add("- [" + cat + "] " + name + (effect.isBlank() ? "" : " — " + effect));
+                            }
+                            int topKOrSafe = topK > 0 ? topK : Math.max(safeCount, lines.size());
+                            String recap = """
                 [변수]
                 TOPK=%d
                 SAFE_COUNT=%d
@@ -442,93 +415,86 @@ public class AgentOrchestrator {
                 [출력 지시]
                 TOPK가 0이면 "추천 후보 중"으로 표현하고, 숫자는 SAFE_COUNT를 사용해도 된다.
                 숫자/이름은 임의 변경하지 말 것.
-                """.formatted(topKOrSafe, safeCount, nick, safeListBlock);
-
-                followupMsgs.add(new SystemMessage(recap));
-            }
-
-            else if (mode.equals(AnswerMode.DUR_INFO)) {
-                if(durInfoJsonResponse != null) {
-                    String template = createDurPrompt(durInfoJsonResponse);
-
-                    followupMsgs.add(new SystemMessage(template));
-                }else {
-                    String error = """
-                            dur 상호작용을 올바르게 찾아내지못하였습니다. 사용자에게 정중히 재입력을 요청해주세요.
-                            """;
-
-                    followupMsgs.add(new SystemMessage(error));
-                }
-            }
-            else if(mode.equals(AnswerMode.DOSE_INFO)){
-                String recap = """
+                """.formatted(topKOrSafe, safeCount, nick, String.join("\n", lines));
+                            followupMsgs.add(new SystemMessage(recap));
+                        } else if (mode.equals(AnswerMode.DUR_INFO)) {
+                            if (durInfoJsonResponse != null) {
+                                followupMsgs.add(new SystemMessage(createDurPrompt(durInfoJsonResponse)));
+                            } else {
+                                followupMsgs.add(new SystemMessage("dur 상호작용을 올바르게 찾아내지못하였습니다. 사용자에게 정중히 재입력을 요청해주세요."));
+                            }
+                        } else if (mode.equals(AnswerMode.DOSE_INFO)) {
+                            String recap = """
                 [변수]
                 사용자 연령 : %s
                 성분명 : %s
-                타입 : %s
+                상태 : %s
                 충분 섭취량 : %s
                 권장 섭취량 : %s
                 최소 섭취량 : %s
                 최대 섭취량 : %s
                 비고 : %s
                 """.formatted(
-                        doseInfo.get("age"),
-                        doseInfo.get("name"),
-                        doseInfo.get("gender"),
-                        doseInfo.get("enough"),
-                        doseInfo.get("recommend"),
-                        doseInfo.get("min"),
-                        doseInfo.get("max"),
-                        doseInfo.get("unit")
-                );
-
-                followupMsgs.add(new SystemMessage(recap));
-            }
-
-            // 모드별 말투/형식 프롬프트 부착
-            switch (mode) {
-                case DUR_INFO -> followupMsgs.add(new SystemMessage(SYS_ANSWER_DUR));
-                case DOSE_INFO -> followupMsgs.add(new SystemMessage(SYS_ANSWER_DOSE));
-                default -> followupMsgs.add(new SystemMessage(SYS_ANSWER_RECAP)); // RECAP
-            }
-
-            var followup = new Prompt(
-                    followupMsgs,
-                    OpenAiChatOptions.builder()
-                            .internalToolExecutionEnabled(false)
-                            .streamUsage(true)
-                            .build()
-            );
-
-            // 👇 스트림 결과를 수집하여 메모리에 저장하는 로직 추가
-            StringBuilder finalAnswer = new StringBuilder();
-
-            Flux<StreamEvent> stream = streamingChatModel.stream(followup)
-                    .map(r -> Optional.ofNullable(r.getResult())
-                            .map(Generation::getOutput).map(AssistantMessage::getText).orElse(""))
-                    .filter(s -> !s.isEmpty())
-                    .doOnNext(finalAnswer::append) // 스트리밍되는 각 조각을 StringBuilder에 추가합니다.
-                    .map(StreamEvent::chunk)
-                    .concatWithValues(StreamEvent.done())
-                    .doOnComplete(() -> {
-                        if (!finalAnswer.toString().isBlank()) {
-                            memory.appendToolResult(session, userText, String.valueOf(finalAnswer));
+                                    doseInfo.get("age"),
+                                    doseInfo.get("name"),
+                                    doseInfo.get("status"),
+                                    doseInfo.get("enough"),
+                                    doseInfo.get("recommend"),
+                                    doseInfo.get("min"),
+                                    doseInfo.get("max"),
+                                    doseInfo.get("unit")
+                            );
+                            followupMsgs.add(new SystemMessage(recap));
                         }
-                    })
-                    .onErrorResume(e -> {
-                        // log.error("스트림 처리 중 에러 발생", e); // 에러 로깅을 추가하면 디버깅에 좋습니다.
-                        return Flux.just(StreamEvent.error(EventCode.STREAM_FAIL, e.getMessage()));
-                    });
 
-            return Flux.concat(
-                    Flux.fromIterable(head),
-                    events.stream().map(Flux::just).reduce(Flux.empty(), Flux::concat),
-                    Flux.just(StreamEvent.status(EventCode.TOOL_START, "도구 실행을 마쳤어요. 답변을 정리할게요.")),
-                    stream
-            );
-        }).subscribeOn(Schedulers.boundedElastic())
-        .contextCapture();
+                        switch (mode) {
+                            case DUR_INFO -> followupMsgs.add(new SystemMessage(SYS_ANSWER_DUR));
+                            case DOSE_INFO -> followupMsgs.add(new SystemMessage(SYS_ANSWER_DOSE));
+                            default -> followupMsgs.add(new SystemMessage(SYS_ANSWER_RECAP));
+                        }
+
+                        var followup = new Prompt(
+                                followupMsgs,
+                                OpenAiChatOptions.builder()
+                                        .internalToolExecutionEnabled(false)
+                                        .streamUsage(true)
+                                        .build()
+                        );
+
+                        // 스트림을 sink로 바로 중계
+                        StringBuilder finalAnswer = new StringBuilder();
+                        streamingChatModel.stream(followup)
+                                .map(r -> Optional.ofNullable(r.getResult())
+                                        .map(Generation::getOutput).map(AssistantMessage::getText).orElse(""))
+                                .filter(s -> !s.isEmpty())
+                                .doOnNext(finalAnswer::append)
+                                .map(StreamEvent::chunk)
+                                .doOnSubscribe(s -> sink.next(StreamEvent.status(EventCode.TOOL_START, "도구 실행을 마쳤어요. 답변을 정리할게요.")))
+                                .doOnNext(sink::next)
+                                .doOnError(sink::error)
+                                .doOnComplete(() -> {
+                                    if (!finalAnswer.toString().isBlank()) {
+                                        memory.appendToolResult(session, userText, String.valueOf(finalAnswer));
+                                    }
+                                    sink.next(StreamEvent.done());
+                                    sink.complete();
+                                })
+                                .subscribe();
+
+                        // 취소/종료시 정리 (필요하다면)
+                        sink.onDispose(() -> {
+                            // TODO: 진행 중 작업 취소 로직 있으면 연결
+                        });
+
+                    } catch (Throwable t) {
+                        // 상단 레벨 예외도 즉시 에러로
+                        sink.error(t);
+                    }
+                }, FluxSink.OverflowStrategy.BUFFER)
+                .subscribeOn(Schedulers.boundedElastic())
+                .contextCapture();
     }
+
 
     private static List<Map<String, Object>> getMaps(DurFilterResult dr) {
         List<Map<String,Object>> tmp = new ArrayList<>();

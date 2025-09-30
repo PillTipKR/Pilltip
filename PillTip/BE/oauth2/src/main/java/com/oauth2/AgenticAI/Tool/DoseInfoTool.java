@@ -6,6 +6,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,17 +21,18 @@ public class DoseInfoTool {
     @Tool(name = "DoseInfoTool", description = "특정 '영양소/제품'과 '나이'에 대한 섭취량 정보를 제공합니다.")
     public Map<String,Object> run(
             @P(value = "nutrient") String nutrient,
-            @P(value = "age") String age) {
+            @P(value = "age") String age,
+            @P(value = "gender") String gender) {
 
-        System.out.println(nutrient+" "+age);
+        System.out.println(nutrient+" "+age+" "+gender);
         // 이 Tool은 AgeNormalizer를 직접 호출하기보다,
         // Orchestrator가 정규화를 마친 뒤 얻은 명확한 'nutrient'와 'age'를 받는 역할에 집중합니다.
 
         // age 문자열("11세", "6개월")을 개월 수로 변환하는 로직이 필요합니다.
         Integer ageInMonths = convertAgeToMonths(age); // 아래에 예시 헬퍼 메서드
-
+        String normalizedGender = normalizeGender(gender);
         // RagSearchService는 이제 nutrient와 ageInMonths를 받도록 수정됩니다.
-        var docs = search.searchDose(nutrient, 5, ageInMonths);
+        var docs = search.searchDose(nutrient, 5, ageInMonths,normalizedGender);
 
         if (docs.isEmpty()) {
             return Map.of(); // 문서가 없으면 빈 Map 반환
@@ -84,5 +86,13 @@ public class DoseInfoTool {
             // 숫자로 변환할 수 없는 문자열이면 null 반환
             return null;
         }
+    }
+
+    private String normalizeGender(String gender) {
+        String[] male = {"아들","도련님","남자","남성","남아","남편","삼촌","아빠"};
+        String[] female = {"딸","공주님","여자","여성","여아","아내","와이프","엄마"};
+        if(Arrays.asList(male).contains(gender)) return "남자";
+        else if(Arrays.asList(female).contains(gender)) return "여자";
+        else return gender;
     }
 }

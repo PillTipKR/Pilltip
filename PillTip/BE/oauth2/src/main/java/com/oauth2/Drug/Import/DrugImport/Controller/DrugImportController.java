@@ -66,6 +66,9 @@ public class DrugImportController {
     @Value("${promptDrug8}")
     private String promptDrug8;
 
+    @Value("${drugTag}")
+    private String drugTag;
+
 
     private final DrugImportService drugImportService;
     private final IngredientImportService ingredientImportService;
@@ -132,7 +135,11 @@ public class DrugImportController {
         importIngrCaution();
     }
 
-
+    @PostMapping("/tag")
+    public String importTag() throws IOException {
+        drugImportService.importEffectTag(drugTag);
+        return "OK";
+    }
 
     @PostMapping("/ingredients")
     public ResponseEntity<?> uploadIngredients(@RequestParam("file") MultipartFile multipartFile) throws IOException {

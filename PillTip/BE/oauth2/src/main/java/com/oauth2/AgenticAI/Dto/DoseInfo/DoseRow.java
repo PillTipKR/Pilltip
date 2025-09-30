@@ -2,7 +2,7 @@ package com.oauth2.AgenticAI.Dto.DoseInfo;
 
 public record DoseRow(
         String name,
-        String gender,
+        String status,
         String ageRange,
         String min,
         String max,
