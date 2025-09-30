@@ -4,6 +4,7 @@ import com.oauth2.Drug.DUR.Domain.ConditionType;
 import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DUR.Domain.SubjectCaution;
 import com.oauth2.Drug.DUR.Repository.SubjectCautionRepository;
+import com.oauth2.Drug.DrugInfo.Domain.Ingredient;
 import com.oauth2.Drug.DrugInfo.Repository.IngredientRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
@@ -16,6 +17,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -55,7 +57,10 @@ public class DrugIngrCautionService {
                 String conditionValue = record.get(2).trim();    // "1세 미만" 등
                 String note = record.get(3).trim();              // 위험성
 
-                List<Long> ingrIds = ingredientRepository.findByIngrName(ingrName);
+                List<Long> ingrIds = ingredientRepository.findByIngrName(ingrName).stream()
+                        .map(Ingredient::getId)   // 엔티티 → ID
+                        .filter(Objects::nonNull)    // 혹시 모를 null 제거
+                        .toList();
 
                 if(ingrIds.isEmpty()) continue;
 

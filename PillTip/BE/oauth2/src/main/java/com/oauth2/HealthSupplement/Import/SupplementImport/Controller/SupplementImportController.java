@@ -1,6 +1,7 @@
 package com.oauth2.HealthSupplement.Import.SupplementImport.Controller;
 
 import com.oauth2.HealthSupplement.Import.SupplementImport.Service.IntakeImportService;
+import com.oauth2.HealthSupplement.Import.SupplementImport.Service.MaterialService;
 import com.oauth2.HealthSupplement.Import.SupplementImport.Service.RatioService;
 import com.oauth2.HealthSupplement.Import.SupplementImport.Service.SupplementFileParser;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class SupplementImportController {
     private final SupplementFileParser supplementFileParser;
     private final RatioService ratioService;
     private final IntakeImportService intakeImportService;
+    private final MaterialService materialService;
 
     @Value("${supplement}")
     private String supplement;
@@ -39,6 +41,12 @@ public class SupplementImportController {
     @PostMapping("/intake")
     private String importIntake() throws IOException {
         intakeImportService.parseAndSave();
+        return "import success";
+    }
+
+    @PostMapping("/raw")
+    private String importRawData() throws IOException {
+        materialService.importRaw();
         return "import success";
     }
 

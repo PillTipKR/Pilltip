@@ -3,6 +3,7 @@ package com.oauth2.Drug.Import.DURImport.Service;
 import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DUR.Domain.SubjectInteraction;
 import com.oauth2.Drug.DUR.Repository.SubjectInteractionRepository;
+import com.oauth2.Drug.DrugInfo.Domain.Ingredient;
 import com.oauth2.Drug.DrugInfo.Repository.DrugIngredientRepository;
 import com.oauth2.Drug.DrugInfo.Repository.IngredientRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -53,8 +55,16 @@ public class DrugIngrInteractionService {
                 List<Long> drugId1 = drugIngredientRepository.findDrugIdsByIngredientName(ingredient1);
                 List<Long> drugId2 = drugIngredientRepository.findDrugIdsByIngredientName(ingredient2);
 
-                List<Long> ingrId1 = ingredientRepository.findByIngrName(ingredient1);
-                List<Long> ingrId2 = ingredientRepository.findByIngrName(ingredient2);
+                List<Long> ingrId1 = ingredientRepository.findByIngrName(ingredient1)
+                        .stream()
+                        .map(Ingredient::getId)   // 엔티티 → ID
+                        .filter(Objects::nonNull)    // 혹시 모를 null 제거
+                        .toList();
+                List<Long> ingrId2 = ingredientRepository.findByIngrName(ingredient2)
+                        .stream()
+                        .map(Ingredient::getId)   // 엔티티 → ID
+                        .filter(Objects::nonNull)    // 혹시 모를 null 제거
+                        .toList();
 
                 if(ingrId1.isEmpty() || ingrId2.isEmpty()) continue;
 
