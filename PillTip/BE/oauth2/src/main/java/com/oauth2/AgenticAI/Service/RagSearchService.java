@@ -39,7 +39,10 @@ public class RagSearchService {
         return retriever.retrieve(query);
     }
 
-    public List<Document> searchDose(String nutrientName, Integer k, Integer userAgeInMonths) {
+    //타입을 추가해야함. (아이,소아,남자,여자)
+    //
+
+    public List<Document> searchDose(String nutrientName, Integer k, Integer userAgeInMonths, String status) {
         Map<String, Object> filter = null;
 
         if (userAgeInMonths != null) {
@@ -57,10 +60,15 @@ public class RagSearchService {
                     "valueInt", userAgeInMonths
             );
 
-            // 3. 두 조건을 AND 연산자로 묶습니다.
+            Map<String, Object> statusCondition = Map.of(
+                    "path", List.of("status"),
+                    "operator", "Equal",
+                    "value", status
+            );
+
             filter = Map.of(
                     "operator", "And",
-                    "operands", List.of(condition1, condition2)
+                    "operands", List.of(condition1, condition2, statusCondition)
             );
         }
 

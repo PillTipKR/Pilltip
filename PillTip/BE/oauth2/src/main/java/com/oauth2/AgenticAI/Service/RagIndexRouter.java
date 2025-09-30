@@ -163,13 +163,13 @@ public class RagIndexRouter {
     // 용법/용량 인덱싱
     public void upsertDose(DoseRow r) {
         String text = "이름:%s %s 상태:%s 충분섭취량:%s 권장섭취량:%s,최소량:%s,최대량:%s,비고:%s"
-                .formatted(nvl(r.name()), nvl(r.ageRange()), nvl(r.gender()),nvl(r.enough()), nvl(r.recommend()),
+                .formatted(nvl(r.name()), nvl(r.ageRange()), nvl(r.status()),nvl(r.enough()), nvl(r.recommend()),
                         nz(r.min()), nz(r.max()), nz(r.unit()));
 
         Map<String,Object> meta = new LinkedHashMap<>();
         put(meta, "name", r.name());
         put(meta, "ageRange", r.ageRange());
-        put(meta, "gender", r.gender());
+        put(meta, "status", r.status());
         put(meta, "enough", r.enough());
         put(meta, "recommend", r.recommend());
         put(meta, "min", r.min());
@@ -189,8 +189,8 @@ public class RagIndexRouter {
         if (ageRange == null || ageRange.isBlank()) return null;
 
         // 예시 패턴: "A~B세", "A~B개월", "A세 이상"
-        Pattern yearRangePattern = Pattern.compile("(\\d+)\\s*~\\s*(\\d+)\\s*세");
-        Pattern monthRangePattern = Pattern.compile("(\\d+)\\s*~\\s*(\\d+)\\s*개월");
+        Pattern yearRangePattern = Pattern.compile("(\\d+)\\s*-\\s*(\\d+)\\s*세");
+        Pattern monthRangePattern = Pattern.compile("(\\d+)\\s*-\\s*(\\d+)\\s*개월");
         Pattern yearOverPattern = Pattern.compile("(\\d+)\\s*세\\s*이상");
 
         Matcher m;
@@ -222,7 +222,7 @@ public class RagIndexRouter {
         return null; // 맞는 패턴이 없을 경우
     }
 
-    public List<DoseRow> parseAndCreateDocuments(String intakeFilePath) throws IOException, IOException {
+    public List<DoseRow> parseAndCreateDocuments(String intakeFilePath) throws IOException {
         List<DoseRow> documents = new ArrayList<>();
         FileInputStream fis = new FileInputStream(intakeFilePath);
         Workbook workbook = new XSSFWorkbook(fis);
@@ -624,5 +624,4 @@ public class RagIndexRouter {
     }
     private static double num(Object o){ return (o instanceof Number n) ? n.doubleValue() : Double.NEGATIVE_INFINITY; }
     private static double round2(double v){ return Math.round(v * 100.0) / 100.0; }
-
 }

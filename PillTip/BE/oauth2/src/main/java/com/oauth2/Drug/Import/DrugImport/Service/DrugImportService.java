@@ -16,8 +16,10 @@ import java.util.stream.Collectors;
 
 import com.oauth2.Drug.DrugInfo.Domain.*;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
+import com.oauth2.Drug.DrugInfo.Repository.DrugTagRepository;
 import com.oauth2.Drug.DrugInfo.Service.*;
 import com.opencsv.CSVReader;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
+@RequiredArgsConstructor
 public class DrugImportService {
     private final DrugService drugService;
     private final IngredientService ingredientService;
@@ -32,20 +35,8 @@ public class DrugImportService {
     private final DrugEffectService drugEffectService;
     private final DrugStorageConditionService drugStorageConditionService;
     private final DrugRepository drugRepository;
+    private final DrugTagRepository drugTagRepository;
     private static final Logger logger = LoggerFactory.getLogger(DrugImportService.class);
-
-    // TODO: 나머지 서비스도 필요시 주입
-
-    public DrugImportService(DrugService drugService, IngredientService ingredientService, DrugIngredientService drugIngredientService, DrugEffectService drugEffectService, DrugStorageConditionService drugStorageConditionService, DrugRepository drugRepository) {
-        this.drugService = drugService;
-        this.ingredientService = ingredientService;
-        this.drugIngredientService = drugIngredientService;
-        this.drugEffectService = drugEffectService;
-        this.drugStorageConditionService = drugStorageConditionService;
-        this.drugRepository = drugRepository;
-    }
-
-
 
     public void importFromFile(String filePath) throws IOException {
         String allText = Files.readString(Path.of(filePath));
@@ -352,6 +343,21 @@ public class DrugImportService {
             drugRepository.saveAll(drugList);
         } catch (Exception e) {
             logger.error("Error occurred in import image: {}", e.getMessage());
+        }
+    }
+
+    public void importEffectTag(String filePath) throws IOException {
+        String allText = Files.readString(Path.of(filePath));
+        String[] blocks = allText.split("\n");
+        for(String block : blocks) {
+            String[] contents = block.split("\t");
+            Long id = Long.parseLong(contents[0].trim());
+            String type = contents[1].trim();
+            type = type.isEmpty()? "":type;
+            DrugTag d = new DrugTag();
+            d.setDrugId(id);
+            d.setTag(type);
+            drugTagRepository.save(d);
         }
     }
 
