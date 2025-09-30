@@ -18,12 +18,15 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -100,6 +103,45 @@ class SearchHiltViewModel @Inject constructor(
                 }
             } finally {
                 _isAutoCompleteLoading.value = false
+            }
+        }
+    }
+
+    /* 건강기능식품 자동완성 API */
+    // 상태
+    private val _supplementAutoComplete = MutableStateFlow<List<SearchData>>(emptyList())
+    val supplementAutoCompleted: StateFlow<List<SearchData>> = _supplementAutoComplete.asStateFlow()
+
+    private val _isSupplementAutoCompleteLoading = MutableStateFlow(false)
+    val isSupplementAutoCompleteLoading: StateFlow<Boolean> = _isSupplementAutoCompleteLoading.asStateFlow()
+
+    private var currentSuppPage = 0
+    private var currentSuppQuery = ""
+
+    // 로딩 함수
+    fun fetchSupplementAutoComplete(query: String, reset: Boolean = false) {
+        if (_isSupplementAutoCompleteLoading.value) return
+        viewModelScope.launch {
+            _isSupplementAutoCompleteLoading.value = true
+            try {
+                if (reset || query != currentSuppQuery) {
+                    currentSuppPage = 0
+                    currentSuppQuery = query
+                    _supplementAutoComplete.value = emptyList()
+                }
+                val newResults = runCatching {
+                    repository.getSupplementAutoComplete(currentSuppQuery, currentSuppPage)
+                }.getOrElse { emptyList() }
+
+                if (newResults.isNotEmpty()) {
+                    // 중복 방지(선택): 동일 id/value 중복 제거
+                    val merged = (_supplementAutoComplete.value + newResults)
+                        .distinctBy { it.id to it.value.trim() }
+                    _supplementAutoComplete.value = merged
+                    currentSuppPage++
+                }
+            } finally {
+                _isSupplementAutoCompleteLoading.value = false
             }
         }
     }
@@ -980,6 +1022,14 @@ data class ChatMessage(
     val streaming: Boolean = false
 )
 
+// ★ 어떤 어시스턴트 말풍선에 붙을 상태 라인인지 구분
+data class StatusEvent(
+    val code: String,
+    val message: String,
+    val ts: Long = System.currentTimeMillis(),
+    val targetId: String
+)
+
 @HiltViewModel
 class AgentChatViewModel @Inject constructor(
     private val agentRepo: AgentChatRepository
@@ -988,75 +1038,126 @@ class AgentChatViewModel @Inject constructor(
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages
 
+    private val _statusEvents = MutableStateFlow<List<StatusEvent>>(emptyList())
+    val statusEvents: StateFlow<List<StatusEvent>> = _statusEvents
+
+    private val _isStreaming = MutableStateFlow(false)
+    val isStreaming: StateFlow<Boolean> = _isStreaming
+
+    private val _agentError = MutableStateFlow<String?>(null)
+    val agentError: StateFlow<String?> = _agentError
+
     private var currentAssistantId: String? = null
+    private val tokenChannel = kotlinx.coroutines.channels.Channel<String>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+    private var tickerJob: kotlinx.coroutines.Job? = null
+
+    private var lastUserText: String? = null
+    private var lastSession: Int = 1
 
     fun send(userText: String, session: Int = 1) {
-        // 1) 사용자 메시지 추가
-        val userMsg = ChatMessage(
-            id = "user-${System.nanoTime()}",
-            role = ChatRole.User,
-            text = userText
-        )
-        // 2) 비어 있는 Assistant 버블(스트리밍용) 추가
+        lastUserText = userText
+        lastSession = session
+        _agentError.value = null
+
+        // 사용자 말풍선
+        val userMsg = ChatMessage(id = "user-${System.nanoTime()}", role = ChatRole.User, text = userText)
+        // 어시스턴트 스트리밍 말풍선 (CHUNK는 전부 여기에 누적)
         val assistantId = "assistant-${System.nanoTime()}"
         currentAssistantId = assistantId
-        val assistantMsg = ChatMessage(
-            id = assistantId,
-            role = ChatRole.Assistant,
-            text = "",
-            streaming = true
-        )
+        val assistantMsg = ChatMessage(id = assistantId, role = ChatRole.Assistant, text = "", streaming = true)
         _messages.value = _messages.value + listOf(userMsg, assistantMsg)
+        _isStreaming.value = true
 
-        // 3) SSE 스트림 시작
-        agentRepo.runAgent(userText, session).onEach { ev ->
-            when (ev) {
-                is AgentUiEvent.Status -> {
-                    appendSystem("${ev.code ?: "STATUS"} • ${ev.message}")
-                }
-                is AgentUiEvent.Token -> {
-                    appendToAssistant(ev.text)
-                }
-                is AgentUiEvent.Final -> {
-                    appendToAssistant(ev.text)
-                    finalizeAssistant()
-                }
-                is AgentUiEvent.ToolResult -> {
-                    appendSystem("툴 실행 결과: ${ev.code ?: ""} ${ev.payload ?: ""}".trim())
-                }
-                is AgentUiEvent.Error -> {
-                    appendSystem("에러: ${ev.message}")
-                    finalizeAssistant()
+        // 잔여 드레인 및 틱커 시작
+        while (tokenChannel.tryReceive().getOrNull() != null) { /* drain */ }
+        startTicker(assistantId)
+
+        agentRepo.runAgent(userText, session)
+            .onEach { ev ->
+                when (ev) {
+                    is AgentUiEvent.Status -> {
+                        addStatus(ev.code ?: "STATUS", ev.message, assistantId)
+                    }
+                    is AgentUiEvent.Token -> {
+                        tokenChannel.trySend(ev.text)
+                    }
+                    is AgentUiEvent.Final -> {
+                        addStatus("FINAL", "답변을 마쳤어요.", assistantId)
+                        stopTicker(finalize = true)
+                    }
+                    is AgentUiEvent.ToolResult -> {
+                        addStatus(ev.code ?: "TOOL", ev.payload ?: "툴 결과 수신", assistantId)
+                    }
+                    is AgentUiEvent.Error -> {
+                        val msg = ev.message
+                        addStatus("ERROR", msg, assistantId)
+                        _agentError.value = msg
+                        stopTicker(finalize = true)
+                    }
                 }
             }
-        }.launchIn(viewModelScope)
+            .catch { e ->
+                val msg = when (e) {
+                    is java.net.SocketTimeoutException -> "서버 응답이 지연되고 있어요."
+                    is java.net.ConnectException -> "서버에 연결할 수 없어요."
+                    is java.net.SocketException -> "네트워크 연결이 불안정해요."
+                    else -> e.message ?: "알 수 없는 오류가 발생했어요."
+                }
+                addStatus("ERROR", msg, assistantId)
+                _agentError.value = msg
+                stopTicker(finalize = true)
+            }
+            .launchIn(viewModelScope)
     }
 
-    private fun appendToAssistant(delta: String) {
-        val id = currentAssistantId ?: return
-        val updated = _messages.value.map {
-            if (it.id == id) it.copy(text = it.text + delta) else it
+    fun retry() {
+        val text = lastUserText ?: return
+        val session = lastSession
+        send(text, session)
+    }
+
+    private fun startTicker(targetId: String) {
+        tickerJob?.cancel()
+        tickerJob = viewModelScope.launch {
+            while (isActive) {
+                val sb = StringBuilder()
+                while (true) {
+                    val t = tokenChannel.tryReceive().getOrNull() ?: break
+                    sb.append(t)
+                }
+                if (sb.isNotEmpty()) appendToAssistant(sb.toString(), targetId)
+                delay(33)
+            }
         }
-        _messages.value = updated
+    }
+
+    private fun stopTicker(finalize: Boolean) {
+        viewModelScope.launch {
+            val sb = StringBuilder()
+            while (true) {
+                val t = tokenChannel.tryReceive().getOrNull() ?: break
+                sb.append(t)
+            }
+            currentAssistantId?.let { id -> if (sb.isNotEmpty()) appendToAssistant(sb.toString(), id) }
+            tickerJob?.cancel()
+            if (finalize) finalizeAssistant()
+            _isStreaming.value = false
+        }
+    }
+
+    private fun appendToAssistant(delta: String, id: String) {
+        _messages.value = _messages.value.map { if (it.id == id) it.copy(text = it.text + delta) else it }
     }
 
     private fun finalizeAssistant() {
         val id = currentAssistantId ?: return
-        val updated = _messages.value.map {
-            if (it.id == id) it.copy(streaming = false) else it
-        }
-        _messages.value = updated
+        _messages.value = _messages.value.map { if (it.id == id) it.copy(streaming = false) else it }
         currentAssistantId = null
     }
 
-    private fun appendSystem(text: String) {
-        val sys = ChatMessage(
-            id = "sys-${System.nanoTime()}",
-            role = ChatRole.System,
-            text = text,
-            streaming = false
-        )
-        _messages.value = _messages.value + sys
+    // ★ 시스템 말풍선으로 "추가 출력"하지 않는다. (대신 UI에서 dashed line으로 렌더)
+    private fun addStatus(code: String, msg: String, targetId: String) {
+        _statusEvents.value = _statusEvents.value + StatusEvent(code = code, message = msg, targetId = targetId)
     }
 }
 
