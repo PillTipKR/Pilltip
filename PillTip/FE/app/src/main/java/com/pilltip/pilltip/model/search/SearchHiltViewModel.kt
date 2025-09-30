@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -102,6 +103,45 @@ class SearchHiltViewModel @Inject constructor(
                 }
             } finally {
                 _isAutoCompleteLoading.value = false
+            }
+        }
+    }
+
+    /* 건강기능식품 자동완성 API */
+    // 상태
+    private val _supplementAutoComplete = MutableStateFlow<List<SearchData>>(emptyList())
+    val supplementAutoCompleted: StateFlow<List<SearchData>> = _supplementAutoComplete.asStateFlow()
+
+    private val _isSupplementAutoCompleteLoading = MutableStateFlow(false)
+    val isSupplementAutoCompleteLoading: StateFlow<Boolean> = _isSupplementAutoCompleteLoading.asStateFlow()
+
+    private var currentSuppPage = 0
+    private var currentSuppQuery = ""
+
+    // 로딩 함수
+    fun fetchSupplementAutoComplete(query: String, reset: Boolean = false) {
+        if (_isSupplementAutoCompleteLoading.value) return
+        viewModelScope.launch {
+            _isSupplementAutoCompleteLoading.value = true
+            try {
+                if (reset || query != currentSuppQuery) {
+                    currentSuppPage = 0
+                    currentSuppQuery = query
+                    _supplementAutoComplete.value = emptyList()
+                }
+                val newResults = runCatching {
+                    repository.getSupplementAutoComplete(currentSuppQuery, currentSuppPage)
+                }.getOrElse { emptyList() }
+
+                if (newResults.isNotEmpty()) {
+                    // 중복 방지(선택): 동일 id/value 중복 제거
+                    val merged = (_supplementAutoComplete.value + newResults)
+                        .distinctBy { it.id to it.value.trim() }
+                    _supplementAutoComplete.value = merged
+                    currentSuppPage++
+                }
+            } finally {
+                _isSupplementAutoCompleteLoading.value = false
             }
         }
     }
@@ -982,11 +1022,12 @@ data class ChatMessage(
     val streaming: Boolean = false
 )
 
-// 상태 타임라인용 (코드별로 분리해서 보이기)
+// ★ 어떤 어시스턴트 말풍선에 붙을 상태 라인인지 구분
 data class StatusEvent(
     val code: String,
     val message: String,
-    val ts: Long = System.currentTimeMillis()
+    val ts: Long = System.currentTimeMillis(),
+    val targetId: String
 )
 
 @HiltViewModel
@@ -997,147 +1038,126 @@ class AgentChatViewModel @Inject constructor(
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages
 
-    // 코드별 상태 타임라인
     private val _statusEvents = MutableStateFlow<List<StatusEvent>>(emptyList())
     val statusEvents: StateFlow<List<StatusEvent>> = _statusEvents
 
-    // 전체 스트리밍 상태(선택사항: 상단 ProgressIndicator 등)
     private val _isStreaming = MutableStateFlow(false)
     val isStreaming: StateFlow<Boolean> = _isStreaming
 
-    private var currentAssistantId: String? = null
+    private val _agentError = MutableStateFlow<String?>(null)
+    val agentError: StateFlow<String?> = _agentError
 
-    // 토큰 누적 채널 + 주기 반영용 잡
+    private var currentAssistantId: String? = null
     private val tokenChannel = kotlinx.coroutines.channels.Channel<String>(kotlinx.coroutines.channels.Channel.UNLIMITED)
     private var tickerJob: kotlinx.coroutines.Job? = null
 
+    private var lastUserText: String? = null
+    private var lastSession: Int = 1
+
     fun send(userText: String, session: Int = 1) {
-        // 1) 사용자 메시지 추가
-        val userMsg = ChatMessage(
-            id = "user-${System.nanoTime()}",
-            role = ChatRole.User,
-            text = userText
-        )
-        // 2) 비어 있는 Assistant 버블(스트리밍용) 추가
+        lastUserText = userText
+        lastSession = session
+        _agentError.value = null
+
+        // 사용자 말풍선
+        val userMsg = ChatMessage(id = "user-${System.nanoTime()}", role = ChatRole.User, text = userText)
+        // 어시스턴트 스트리밍 말풍선 (CHUNK는 전부 여기에 누적)
         val assistantId = "assistant-${System.nanoTime()}"
         currentAssistantId = assistantId
-        val assistantMsg = ChatMessage(
-            id = assistantId,
-            role = ChatRole.Assistant,
-            text = "",
-            streaming = true
-        )
+        val assistantMsg = ChatMessage(id = assistantId, role = ChatRole.Assistant, text = "", streaming = true)
         _messages.value = _messages.value + listOf(userMsg, assistantMsg)
         _isStreaming.value = true
 
-        // 2.5) 이전 잔여 토큰 비우기
-        while (true) {
-            val t = tokenChannel.tryReceive().getOrNull() ?: break
-            // drop
-        }
-
-        // 3) 토큰 틱커 시작(33ms마다 누적치 반영)
+        // 잔여 드레인 및 틱커 시작
+        while (tokenChannel.tryReceive().getOrNull() != null) { /* drain */ }
         startTicker(assistantId)
 
-        // 4) SSE 스트림 시작
-        agentRepo.runAgent(userText, session).onEach { ev ->
-            when (ev) {
-                is AgentUiEvent.Status -> {
-                    addStatus(ev.code ?: "STATUS", ev.message)
-                }
-                is AgentUiEvent.Token -> {
-                    // 토큰은 즉시 말풍선에 붙이지 않고 채널에 적재
-                    tokenChannel.trySend(ev.text)
-                }
-                is AgentUiEvent.Final -> {
-                    if (ev.text.isNotEmpty()) tokenChannel.trySend(ev.text)
-                    stopTicker(finalize = true)
-                }
-                is AgentUiEvent.ToolResult -> {
-                    addStatus(ev.code ?: "TOOL", ev.payload ?: "툴 결과 수신")
-                }
-                is AgentUiEvent.Error -> {
-                    addStatus("ERROR", ev.message)
-                    stopTicker(finalize = true)
+        agentRepo.runAgent(userText, session)
+            .onEach { ev ->
+                when (ev) {
+                    is AgentUiEvent.Status -> {
+                        addStatus(ev.code ?: "STATUS", ev.message, assistantId)
+                    }
+                    is AgentUiEvent.Token -> {
+                        tokenChannel.trySend(ev.text)
+                    }
+                    is AgentUiEvent.Final -> {
+                        addStatus("FINAL", "답변을 마쳤어요.", assistantId)
+                        stopTicker(finalize = true)
+                    }
+                    is AgentUiEvent.ToolResult -> {
+                        addStatus(ev.code ?: "TOOL", ev.payload ?: "툴 결과 수신", assistantId)
+                    }
+                    is AgentUiEvent.Error -> {
+                        val msg = ev.message
+                        addStatus("ERROR", msg, assistantId)
+                        _agentError.value = msg
+                        stopTicker(finalize = true)
+                    }
                 }
             }
-        }.launchIn(viewModelScope)
+            .catch { e ->
+                val msg = when (e) {
+                    is java.net.SocketTimeoutException -> "서버 응답이 지연되고 있어요."
+                    is java.net.ConnectException -> "서버에 연결할 수 없어요."
+                    is java.net.SocketException -> "네트워크 연결이 불안정해요."
+                    else -> e.message ?: "알 수 없는 오류가 발생했어요."
+                }
+                addStatus("ERROR", msg, assistantId)
+                _agentError.value = msg
+                stopTicker(finalize = true)
+            }
+            .launchIn(viewModelScope)
     }
 
-    /** 토큰 모아붙이기: targetId 말풍선에 33ms마다 현재 누적 토큰 반영 */
+    fun retry() {
+        val text = lastUserText ?: return
+        val session = lastSession
+        send(text, session)
+    }
+
     private fun startTicker(targetId: String) {
         tickerJob?.cancel()
         tickerJob = viewModelScope.launch {
             while (isActive) {
                 val sb = StringBuilder()
-                // 현재 큐에 쌓인 토큰 모두 비우기(이번 틱에 반영)
                 while (true) {
                     val t = tokenChannel.tryReceive().getOrNull() ?: break
                     sb.append(t)
                 }
-                if (sb.isNotEmpty()) {
-                    appendToAssistant(sb.toString(), targetId)
-                }
-                delay(33) // 30~50ms 권장 (한글도 자연스럽게 '주르륵')
+                if (sb.isNotEmpty()) appendToAssistant(sb.toString(), targetId)
+                delay(33)
             }
         }
     }
 
-    /** 틱커 종료 + 잔여 토큰 플러시 + 말풍선 고정 */
     private fun stopTicker(finalize: Boolean) {
         viewModelScope.launch {
-            // 남은 토큰 한 번에 반영
             val sb = StringBuilder()
             while (true) {
                 val t = tokenChannel.tryReceive().getOrNull() ?: break
                 sb.append(t)
             }
-            currentAssistantId?.let { id ->
-                if (sb.isNotEmpty()) appendToAssistant(sb.toString(), id)
-            }
+            currentAssistantId?.let { id -> if (sb.isNotEmpty()) appendToAssistant(sb.toString(), id) }
             tickerJob?.cancel()
             if (finalize) finalizeAssistant()
             _isStreaming.value = false
         }
     }
 
-    // 기존 append는 유지(호환), 내부적으로는 id 지정 버전 사용
-    private fun appendToAssistant(delta: String) {
-        val id = currentAssistantId ?: return
-        appendToAssistant(delta, id)
-    }
-
     private fun appendToAssistant(delta: String, id: String) {
-        val updated = _messages.value.map {
-            if (it.id == id) it.copy(text = it.text + delta) else it
-        }
-        _messages.value = updated
+        _messages.value = _messages.value.map { if (it.id == id) it.copy(text = it.text + delta) else it }
     }
 
     private fun finalizeAssistant() {
         val id = currentAssistantId ?: return
-        val updated = _messages.value.map {
-            if (it.id == id) it.copy(streaming = false) else it
-        }
-        _messages.value = updated
+        _messages.value = _messages.value.map { if (it.id == id) it.copy(streaming = false) else it }
         currentAssistantId = null
     }
 
-    private fun appendSystem(text: String) {
-        val sys = ChatMessage(
-            id = "sys-${System.nanoTime()}",
-            role = ChatRole.System,
-            text = text,
-            streaming = false
-        )
-        _messages.value = _messages.value + sys
-    }
-
-    private fun addStatus(code: String, msg: String) {
-        // 코드별 타임라인에 기록
-        _statusEvents.value = _statusEvents.value + StatusEvent(code, msg)
-        // 원하면 시스템 말풍선으로도 동시에 보여주기
-        appendSystem("$code • $msg")
+    // ★ 시스템 말풍선으로 "추가 출력"하지 않는다. (대신 UI에서 dashed line으로 렌더)
+    private fun addStatus(code: String, msg: String, targetId: String) {
+        _statusEvents.value = _statusEvents.value + StatusEvent(code = code, message = msg, targetId = targetId)
     }
 }
 

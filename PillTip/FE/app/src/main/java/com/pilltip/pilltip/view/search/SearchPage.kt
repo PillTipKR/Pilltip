@@ -154,8 +154,12 @@ fun SearchPage(
     var inputText by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
     val recentSearches by logViewModel.recentSearches.collectAsState()
+    //의약품
     val autoCompleted by searchViewModel.autoCompleted.collectAsState()
     val isLoading by searchViewModel.isAutoCompleteLoading.collectAsState()
+    //건기식
+    val supplementAutoCompleted by searchViewModel.supplementAutoCompleted.collectAsState()
+    val isSuppLoading by searchViewModel.isSupplementAutoCompleteLoading.collectAsState()
     BackHandler {
         navController.navigate("PillMainPage") {
             popUpTo("PillMainPage") {
@@ -166,13 +170,15 @@ fun SearchPage(
     }
 
     LaunchedEffect(Unit) {
-        snapshotFlow { inputText }
+        snapshotFlow { inputText to selected }
             .debounce(700)
             .distinctUntilChanged()
-            .filter { it.isNotEmpty() }
-            .collect { debouncedText ->
-                if (debouncedText.isNotBlank()) {
+            .filter { (text, _) -> text.isNotBlank() }
+            .collect { (debouncedText, tab) ->
+                if (tab == 0) {
                     searchViewModel.fetchAutoComplete(debouncedText, reset = true)
+                } else {
+                    searchViewModel.fetchSupplementAutoComplete(debouncedText, reset = true)
                 }
             }
     }
@@ -315,25 +321,45 @@ fun SearchPage(
                 }
             }
         } else {
+            val searched = if (selected == 0) autoCompleted else supplementAutoCompleted
+            val loading = if (selected == 0) isLoading else isSuppLoading
+
             Box(modifier = Modifier.fillMaxSize()) {
                 AutoCompleteList(
                     query = inputText,
-                    searched = autoCompleted,
-                    onClick = { selected ->
-                        inputText = selected.value
-                        searchViewModel.fetchDrugSearch(selected.value)
-                        logViewModel.addSearchQuery(selected.value)
-                        navController.navigate("SearchResultsPage/${selected.value}") {
-                            popUpTo("MainPage") { inclusive = false }
-                            launchSingleTop = true
+                    searched = searched,
+                    onClick = { item ->
+                        inputText = item.value
+                        logViewModel.addSearchQuery(item.value)
+
+                        if (selected == 0) {
+                            // 의약품 검색
+                            searchViewModel.fetchDrugSearch(item.value)
+                            navController.navigate("SearchResultsPage/${item.value}") {
+                                popUpTo("MainPage") { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        } else {
+                            // 건기식 결과 화면 라우팅 (둘 중 하나로 맞춰 써줘)
+                            // 1) 별도 페이지:
+                            // navController.navigate("SupplementResultsPage/${item.value}") { ... }
+                            // 2) 같은 페이지 + 쿼리 파라미터:
+                            navController.navigate("SearchResultsPage/${item.value}?type=supplement") {
+                                popUpTo("MainPage") { inclusive = false }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onLoadMore = {
-                        searchViewModel.fetchAutoComplete(inputText)
+                        if (selected == 0) {
+                            searchViewModel.fetchAutoComplete(inputText)
+                        } else {
+                            searchViewModel.fetchSupplementAutoComplete(inputText)
+                        }
                     }
                 )
 
-                if (isLoading) {
+                if (loading) {
                     HeightSpacer(40.dp)
                     CircularProgressIndicator(
                         modifier = Modifier
@@ -344,7 +370,7 @@ fun SearchPage(
                     )
                 }
 
-                if (!isLoading && autoCompleted.isEmpty()) {
+                if (!loading && searched.isEmpty()) {
                     HeightSpacer(40.dp)
                     Text(
                         text = "검색 결과가 없어요",
