@@ -5,11 +5,14 @@ import com.oauth2.AgenticAI.Dto.DurInfo.DurRuleRow;
 import com.oauth2.AgenticAI.Dto.ProductTool.ProductRow;
 import com.oauth2.Drug.DUR.Domain.DurType;
 import com.oauth2.Drug.DrugInfo.Domain.Drug;
-import com.oauth2.Drug.DrugInfo.Domain.DrugEffect;
+import com.oauth2.Drug.DrugInfo.Domain.DrugTag;
 import com.oauth2.Drug.DrugInfo.Domain.Ingredient;
 import com.oauth2.Drug.DrugInfo.Repository.DrugRepository;
+import com.oauth2.Drug.DrugInfo.Repository.DrugTagRepository;
 import com.oauth2.Drug.DrugInfo.Repository.IngredientRepository;
 import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplement;
+import com.oauth2.HealthSupplement.SupplementInfo.Entity.HealthSupplementMat;
+import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementMatRepository;
 import com.oauth2.HealthSupplement.SupplementInfo.Repository.HealthSupplementRepository;
 import io.weaviate.client.WeaviateClient;
 import lombok.RequiredArgsConstructor;
@@ -40,8 +43,10 @@ public class RagIndexRouter {
 
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
     private final DrugRepository drugRepository;
+    private final DrugTagRepository drugTagRepository;
     private final HealthSupplementRepository supplementRepository;
     private final IngredientRepository ingredientRepository;
+    private final HealthSupplementMatRepository healthSupplementMatRepository;
     private final WeaviateClient client;
     private final DataFormatter formatter = new DataFormatter();
 
@@ -57,11 +62,12 @@ public class RagIndexRouter {
         List<Drug> drugs = drugRepository.findAll();
         List<HealthSupplement> healthSupplements = supplementRepository.findAll();
         List<Ingredient> ingredients = ingredientRepository.findAll();
+        List<HealthSupplementMat> healthSupplementMats = healthSupplementMatRepository.findAll();
         upsertDur(buildDurRow(113L,DurType.DRUGINGR));
         for(Ingredient i : ingredients) upsertDur(buildDurRow(i.getId(), DurType.DRUGINGR));
         for(Drug d: drugs) upsertDur(buildDurRow(d.getId(),DurType.DRUG));
         for(HealthSupplement hs : healthSupplements) upsertDur(buildDurRow(hs.getId(),DurType.SUPPLEMENT));
-
+        for(HealthSupplementMat hm : healthSupplementMats) upsertDur(buildDurRow(hm.getId(),DurType.SUPINGR));
     }
 
     public void batchDose() throws IOException {
@@ -76,23 +82,21 @@ public class RagIndexRouter {
     public ProductRow buildDrugRow(Long id) {
         // 한 번의 쿼리로 Drug과 관련된 DrugEffect, DrugStorageCondition을 가져옵니다.
         Optional<Drug> drug = drugRepository.findDrugWithAllRelations(id);
-        Set<DrugEffect> effectDetails = new HashSet<>();
-        if (drug.isPresent()) {
-            effectDetails = drug.get().getDrugEffects();
+        DrugTag drugIng = drugTagRepository.findById(id).orElse(null);
 
-        }
-        DrugEffect effects = effectDetails.stream()
-                .filter(e -> e.getType() == DrugEffect.Type.EFFECT)
-                .toList().get(0);
-        return drug.map(value -> new ProductRow(
-                id,
-                value.getName(),
-                value.getManufacturer(),
-                effects.getContent(),
-                value.getForm(),
-                "일반의약품"
 
-                )).orElse(null);
+        return drug.map(value -> {
+            assert drugIng != null;
+            return new ProductRow(
+                    id,
+                    value.getName(),
+                    value.getManufacturer(),
+                    drugIng.getTag(),
+                    value.getForm(),
+                    "일반의약품"
+
+                    );
+        }).orElse(null);
     }
 
     public DurRuleRow buildDurRow(Long id, DurType durType){
@@ -122,7 +126,13 @@ public class RagIndexRouter {
                         durType.name()
                 );
             default:
-                return null;
+                HealthSupplementMat healthSupplementMat = healthSupplementMatRepository.findById(id).orElse(null);
+                assert healthSupplementMat != null;
+                return new DurRuleRow(
+                        String.valueOf(healthSupplementMat.getId()),
+                        healthSupplementMat.getMaterialName(),
+                        durType.name()
+                );
         }
 
     }

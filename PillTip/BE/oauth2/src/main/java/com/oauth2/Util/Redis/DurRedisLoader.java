@@ -198,10 +198,10 @@ public class DurRedisLoader {
     private void saveCautions(DurType durType) throws JsonProcessingException {
         List<SubjectCaution> cautions = subjectCautionRepository.findByDurtype(durType);
         String type = switch (durType) {
-            case SUPPLEMENT -> "SUPPLEMENT";
-            case DRUG -> "DRUG";
-            case DRUGINGR -> "DRUGINGR";
-            default -> "SUPINGR";
+            case SUPPLEMENT -> supplementTag;
+            case DRUG -> drugTag;
+            case DRUGINGR -> drugIngrTag;
+            default -> supIngrTag;
         };
         for (SubjectCaution sc : cautions) {
             String key = type + ":DUR:" + sc.getConditionType().name() + ":" + sc.getSubjectId();

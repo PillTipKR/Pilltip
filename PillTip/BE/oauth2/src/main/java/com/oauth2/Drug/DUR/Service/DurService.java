@@ -32,17 +32,17 @@ public class DurService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${redis.supplement.tag}")
-    private String supplementTag;
-
-    @Value("${redis.drug.tag}")
-    private String drugTag;
-
     @Value("${redis.inter.tag}")
     private String interTag;
 
     @Value("${redis.inter.detail.tag}")
     private String interDetailTag;
+
+    @Value("${redis.supplement.tag}")
+    private String supplementTag;
+
+    @Value("${redis.drug.tag}")
+    private String drugTag;
 
     @Value("${redis.drug.ingr.tag}")
     private String drugIngrTag;
