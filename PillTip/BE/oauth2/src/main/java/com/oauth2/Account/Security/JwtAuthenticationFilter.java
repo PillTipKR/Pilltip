@@ -50,7 +50,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             requestURI.startsWith("/questionnaire/public/") ||
             requestURI.startsWith("/api/friend/inviting") ||
             requestURI.startsWith("/invite.html") ||
-            requestURI.startsWith("/api/questionnaire/qr-url/all")) {
+            requestURI.startsWith("/api/questionnaire/qr-url/all") ||
+            requestURI.startsWith("/api/ml/predict")) {
             filterChain.doFilter(request, response);
             return;
         }

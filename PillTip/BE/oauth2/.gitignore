@@ -55,3 +55,6 @@ src/main/resources/ssl/keystore.*
 **/ssl/*
 
 **/upload/*
+
+**/Dockerfile
+**/docker-compose.yml
