@@ -108,7 +108,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
     <tr>
      <td align="center" width="25%">
         <img src="https://avatars.githubusercontent.com/u/77396909?v=4" width="100" height="100"><br>
-        <a href="https://github.com/gykim22">김기윤</a><br>
+        <a href="https://github.com/GiyunKim00">김기윤</a><br>
         FE
       </td>
       <td align="center" width="25%">
@@ -132,6 +132,7 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 
 Copyright 2025 '**Pilltip**' All right reserved.
 본 레포지토리 내 코드 또는 작업물의 무단 복제 및 사전 동의 없는 활용을 금합니다.
+
 
 
 
