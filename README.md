@@ -51,26 +51,26 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 
 이러한 문제들은 사용자가 **스스로 약물 정보를 통합 관리하고, 약물 상호작용 및 부작용을 사전에 인지할 수 있는 새로운 디지털 솔루션**의 필요성을 시사합니다.
 
-<img width="7680" height="4320" alt="4" src="https://github.com/user-attachments/assets/1ddfb222-2b4a-49bc-9409-68eda49d8325" />
-<img width="7680" height="4320" alt="5" src="https://github.com/user-attachments/assets/fa8b5b33-b54d-462c-8342-7b07ecfd6fe7" />
-<img width="7680" height="4320" alt="5 (1)" src="https://github.com/user-attachments/assets/39991f19-9ecf-4d1e-900f-67a3902fc390" />
+<img width="7680" height="4320" alt="약품설명부족" src="https://github.com/user-attachments/assets/1ddfb222-2b4a-49bc-9409-68eda49d8325" />
+<img width="7680" height="4320" alt="DUR법제화미흡" src="https://github.com/user-attachments/assets/fa8b5b33-b54d-462c-8342-7b07ecfd6fe7" />
+<img width="7680" height="4320" alt="다약제 복용 증가" src="https://github.com/user-attachments/assets/39991f19-9ecf-4d1e-900f-67a3902fc390" />
 
 ## 페르소나
-<img width="7680" height="4320" alt="17" src="https://github.com/user-attachments/assets/ad7d1446-3a02-4e39-a5d3-fbe8643e8562" />
+<img width="7680" height="4320" alt="페르소나" src="https://github.com/user-attachments/assets/ad7d1446-3a02-4e39-a5d3-fbe8643e8562" />
 
 ## 서비스 소개
-<img width="7680" height="4320" alt="20" src="https://github.com/user-attachments/assets/1c0d29e9-d55d-4cfe-844c-ecc514b7fe67" />
-<img width="7680" height="4320" alt="19" src="https://github.com/user-attachments/assets/ea5b6f76-cf30-4473-97f1-1fd549d4d548" />
-<img width="7680" height="4320" alt="23" src="https://github.com/user-attachments/assets/25714580-e13b-4286-8fda-6641827701cc" />
-<img width="7680" height="4320" alt="24" src="https://github.com/user-attachments/assets/7ef300c2-51f5-4ac1-8e13-94c8533dcb2c" />
-<img width="7680" height="4320" alt="25" src="https://github.com/user-attachments/assets/11a1faf7-99be-438b-8b04-c5f61e9730ae" />
-<img width="7680" height="4320" alt="26" src="https://github.com/user-attachments/assets/8d56c6f6-c392-4217-8a89-b5994babe31a" />
+<img width="7680" height="4320" alt="DUR시스템 아키텍처" src="https://github.com/user-attachments/assets/1c0d29e9-d55d-4cfe-844c-ecc514b7fe67" />
+<img width="7680" height="4320" alt="DUR시스템 설명" src="https://github.com/user-attachments/assets/6318070d-511a-4b4c-8252-8bee03670b33" />
+<img width="7680" height="4320" alt="약품검색" src="https://github.com/user-attachments/assets/25714580-e13b-4286-8fda-6641827701cc" />
+<img width="7680" height="4320" alt="약품검색_맞춤안내" src="https://github.com/user-attachments/assets/7ef300c2-51f5-4ac1-8e13-94c8533dcb2c" />
+<img width="7680" height="4320" alt="복약알림" src="https://github.com/user-attachments/assets/11a1faf7-99be-438b-8b04-c5f61e9730ae" />
+<img width="7680" height="4320" alt="문진표" src="https://github.com/user-attachments/assets/8d56c6f6-c392-4217-8a89-b5994babe31a" />
 <img width="7680" height="4320" alt="가족관리" src="https://github.com/user-attachments/assets/79e97659-935a-48d7-838b-14f93c580206" />
 <img width="7680" height="4320" alt="AI 챗봇" src="https://github.com/user-attachments/assets/151cca20-9601-4aba-bb22-259348c17b20" />
-<img width="7680" height="4320" alt="29" src="https://github.com/user-attachments/assets/87112244-0318-4806-bceb-856ef34a58d6" />
-<img width="7680" height="4320" alt="31" src="https://github.com/user-attachments/assets/5010a665-26d7-440c-8e67-2b00d6f7a624" />
-<img width="7680" height="4320" alt="32" src="https://github.com/user-attachments/assets/3ad38c1f-14ed-463a-a209-98f0252a6f94" />
-<img width="7680" height="4320" alt="33" src="https://github.com/user-attachments/assets/8e874969-a82a-48c2-9fe5-4188104d600a" />
+<img width="7680" height="4320" alt="올인원_1" src="https://github.com/user-attachments/assets/87112244-0318-4806-bceb-856ef34a58d6" />
+<img width="7680" height="4320" alt="올인원_2" src="https://github.com/user-attachments/assets/5010a665-26d7-440c-8e67-2b00d6f7a624" />
+<img width="7680" height="4320" alt="올인원_3" src="https://github.com/user-attachments/assets/3ad38c1f-14ed-463a-a209-98f0252a6f94" />
+<img width="7680" height="4320" alt="올인원_마무리" src="https://github.com/user-attachments/assets/8e874969-a82a-48c2-9fe5-4188104d600a" />
 
 ## 기술 및 아키텍처
 **기술 스택**
