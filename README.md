@@ -1,5 +1,5 @@
 # 💊 Pilltip
-<img width="7680" height="4320" alt="34" src="https://github.com/user-attachments/assets/47538752-b8fa-46c1-9f76-7621ca8e7670" />
+<img width="7680" height="4320" alt="메인배너" src="https://github.com/user-attachments/assets/47538752-b8fa-46c1-9f76-7621ca8e7670" />
 
 ## Pilltip | 당신만의 개인맞춤 AI 안전복약 솔루션
 
@@ -65,6 +65,8 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 <img width="7680" height="4320" alt="24" src="https://github.com/user-attachments/assets/7ef300c2-51f5-4ac1-8e13-94c8533dcb2c" />
 <img width="7680" height="4320" alt="25" src="https://github.com/user-attachments/assets/11a1faf7-99be-438b-8b04-c5f61e9730ae" />
 <img width="7680" height="4320" alt="26" src="https://github.com/user-attachments/assets/8d56c6f6-c392-4217-8a89-b5994babe31a" />
+<img width="7680" height="4320" alt="가족관리" src="https://github.com/user-attachments/assets/79e97659-935a-48d7-838b-14f93c580206" />
+<img width="7680" height="4320" alt="AI 챗봇" src="https://github.com/user-attachments/assets/151cca20-9601-4aba-bb22-259348c17b20" />
 <img width="7680" height="4320" alt="29" src="https://github.com/user-attachments/assets/87112244-0318-4806-bceb-856ef34a58d6" />
 <img width="7680" height="4320" alt="31" src="https://github.com/user-attachments/assets/5010a665-26d7-440c-8e67-2b00d6f7a624" />
 <img width="7680" height="4320" alt="32" src="https://github.com/user-attachments/assets/3ad38c1f-14ed-463a-a209-98f0252a6f94" />
@@ -89,8 +91,11 @@ Pilltip은 개인의 건강 상태와 복약 이력을 기반으로, 맞춤형 A
 - Open AI API (GPT-4o mini))
 
 **아키텍처**
-<img width="7680" height="4320" alt="2025 SW중심대학 디지털 경진대회 SW부문 아이디어 최종본 pdf - Page 10 of 38" src="https://github.com/user-attachments/assets/b9b73e02-920c-47b6-8a46-9da504e82d01" />
-<img width="7680" height="4320" alt="20" src="https://github.com/user-attachments/assets/1c0d29e9-d55d-4cfe-844c-ecc514b7fe67" />
+<img width="7680" height="4320" alt="시스템아키텍처" src="https://github.com/user-attachments/assets/e9f4c07d-fc5d-4967-90fb-31a637053375" />
+<!-- 
+위에 똑같은 거 있음
+<img width="7680" height="4320" alt="20" src="https://github.com/user-attachments/assets/1c0d29e9-d55d-4cfe-844c-ecc514b7fe67" /> 
+-->
 
 
 ## 팀 Pilltip 💊
